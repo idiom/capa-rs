@@ -1,0 +1,22 @@
+rule:
+  meta:
+    name: invoke .NET method via reflection (string-based)
+    namespace: load-code/dotnet
+    authors:
+      - yeti-sec
+    description: References .NET reflection methods for dynamic method invocation. Common in loaders and obfuscated malware.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Reflective Code Loading [T1620]
+    mbc:
+      - Defense Evasion::Reflective Code Loading [E1620]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "MethodInfo.Invoke"
+        - string: "Activator.CreateInstance"
+        - string: "Type.InvokeMember"
+        - string: "Delegate.DynamicInvoke"

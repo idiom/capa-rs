@@ -1,0 +1,27 @@
+[package]
+name = "capa-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Command-line interface for capa-rs capability detection"
+
+[[bin]]
+name = "capa-rs"
+path = "src/main.rs"
+
+[dependencies]
+capa-core = { workspace = true }
+capa-backend = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+rayon = { workspace = true }
+tabled = { workspace = true }
+colored = { workspace = true }
+
+[features]
+default = []
+# .NET analysis via dotscope - enables proper .NET metadata extraction
+dotnet = ["capa-backend/dotnet"]

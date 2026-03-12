@@ -1,0 +1,24 @@
+rule:
+  meta:
+    name: reference Windows Defender components
+    namespace: anti-analysis/anti-av
+    authors:
+      - yeti-sec
+    description: References Windows Defender process or component names, indicating potential AV evasion or process termination.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Impair Defenses::Disable or Modify Tools [T1562.001]
+    mbc:
+      - Anti-Behavioral Analysis::Detect Security Software [B0009]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "MsMpEng.exe"
+        - string: "MSASCui.exe"
+        - string: "MpCmdRun.exe"
+        - string: "NisSrv.exe"
+        - string: "MpUXSrv.exe"
+        - string: "Windows Defender"

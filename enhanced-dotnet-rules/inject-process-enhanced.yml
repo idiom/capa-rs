@@ -1,0 +1,26 @@
+rule:
+  meta:
+    name: inject code into process (function-scope with IL)
+    namespace: host-interaction/process/inject
+    authors:
+      - capa-rs
+    description: >
+      Process injection via P/Invoke with characteristic memory allocation,
+      writing, and thread creation. IL patterns confirm actual usage.
+    scopes:
+      static: function
+      dynamic: call
+    att&ck:
+      - Defense Evasion::Process Injection [T1055]
+  features:
+    - and:
+      - format: dotnet
+      - 2 or more:
+        - string: /VirtualAlloc/i
+        - string: /WriteProcessMemory/i
+        - string: /CreateRemoteThread/i
+        - string: /NtCreateThreadEx/i
+      - or:
+        - number: 0x40       # PAGE_EXECUTE_READWRITE
+        - number: 0x3000     # MEM_COMMIT | MEM_RESERVE
+      - mnemonic: call       # P/Invoke calls

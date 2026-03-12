@@ -1,0 +1,34 @@
+rule:
+  meta:
+    name: use DInvoke for API evasion in .NET
+    namespace: anti-analysis/anti-av
+    authors:
+      - yeti-sec
+    description: >
+      Uses DInvoke (Dynamic Invoke) pattern to call Windows APIs dynamically,
+      bypassing static import table analysis and EDR API hooks. This technique
+      resolves APIs at runtime using GetProcAddress/GetExportAddress.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Obfuscated Files or Information::Dynamic API Resolution [T1027.007]
+    mbc:
+      - Anti-Static Analysis::Dynamic API Resolution [B0008.001]
+    references:
+      - https://thewover.github.io/Dynamic-Invoke/
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "DInvokeCore"
+        - string: "DynamicAPIInvoke"
+        - string: "DynamicFunctionInvoke"
+        - string: "GetDelegateForFunctionPointer"
+      - or:
+        - string: "GetLibraryAddress"
+        - string: "GetExportAddress"
+        - string: "ntdll.dll"
+        - string: "kernel32.dll"

@@ -1,0 +1,24 @@
+rule:
+  meta:
+    name: log keystrokes via hook (function-scope with IL)
+    namespace: collection/keylog
+    authors:
+      - capa-rs
+    description: >
+      Installs keyboard hook for keylogging. IL patterns detect the hook
+      installation function with characteristic integer constants for hook types.
+    scopes:
+      static: function
+      dynamic: call
+    att&ck:
+      - Collection::Input Capture::Keylogging [T1056.001]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "SetWindowsHookEx"
+        - string: "user32.SetWindowsHookEx"
+      - or:
+        - number: 2           # WH_KEYBOARD
+        - number: 13          # WH_KEYBOARD_LL
+      - mnemonic: call        # P/Invoke call

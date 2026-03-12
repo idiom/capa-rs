@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/capa-core",
+    "crates/capa-backend",
+    "crates/capa-cli",
+    "crates/dotscope",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/yeti-sec/capa-rs"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+
+# Pattern matching
+regex = "1.10"
+fancy-regex = "0.14"
+aho-corasick = "1.1"
+memchr = "2.7"  # Fast byte pattern searching
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+tabled = "0.15"
+
+# Parallelism
+rayon = "1.8"
+dashmap = "5.5"
+
+# Binary analysis
+goblin = "0.10"
+iced-x86 = "1.21"  # Blazingly fast x86/x64 disassembler (>250 MB/s)
+capstone = "0.14"  # Multi-architecture disassembler (ARM, AArch64, MIPS, etc.)
+
+# Hashing
+md-5 = "0.10"
+sha1 = "0.10"
+sha2 = "0.10"
+
+# Terminal colors
+colored = "2.1"
+
+# Internal crates
+capa-core = { path = "crates/capa-core" }
+capa-backend = { path = "crates/capa-backend" }

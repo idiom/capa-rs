@@ -1,0 +1,31 @@
+rule:
+  meta:
+    name: access webcam via DirectShow in .NET
+    namespace: collection/webcam
+    authors:
+      - yeti-sec
+    description: >
+      Uses DirectShow (COM) interfaces to enumerate and capture video from
+      webcam devices. ICreateDevEnum is the primary interface used to
+      enumerate video capture devices.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Collection::Video Capture [T1125]
+    mbc:
+      - Collection::Capture Video [E1125]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "ICreateDevEnum"
+        - string: "29840822-5B84-11D0-BD3B-00A0C911CE86"
+        - string: "$29840822-5B84-11D0-BD3B-00A0C911CE86"
+      - or:
+        - string: "havecamera"
+        - string: "Camera"
+        - string: "ppEnumMoniker"
+        - string: "IBindCtx"

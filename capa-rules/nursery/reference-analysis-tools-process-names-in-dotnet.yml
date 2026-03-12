@@ -1,0 +1,27 @@
+rule:
+  meta:
+    name: reference analysis tools process names in .NET
+    namespace: anti-analysis
+    authors:
+      - yeti-sec
+    description: References process names of common analysis and debugging tools, indicating potential anti-analysis behavior.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Discovery::Process Discovery [T1057]
+    mbc:
+      - Discovery::Analysis Tool Discovery::Process detection [B0013.001]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "ProcessHacker.exe"
+        - string: "procexp.exe"
+        - string: "Taskmgr.exe"
+        - string: "x32dbg.exe"
+        - string: "x64dbg.exe"
+        - string: "dnspy.exe"
+        - string: "ollydbg.exe"
+        - string: "Wireshark.exe"
+        - string: "Fiddler.exe"

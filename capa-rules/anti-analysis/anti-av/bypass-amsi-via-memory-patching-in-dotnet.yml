@@ -1,0 +1,33 @@
+rule:
+  meta:
+    name: bypass AMSI via memory patching in .NET
+    namespace: anti-analysis/anti-av
+    authors:
+      - yeti-sec
+    description: >
+      Patches AmsiScanBuffer in memory to bypass AMSI (Antimalware Scan Interface).
+      This is a common technique in .NET malware to evade runtime AV scanning.
+      The base64 string "YW1zaS5kbGw=" decodes to "amsi.dll".
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Impair Defenses::Disable or Modify Tools [T1562.001]
+    mbc:
+      - Defense Evasion::Disable or Evade Security Tools::Disable Windows Security Center [F0004.007]
+    references:
+      - https://rastamouse.me/memory-patching-amsi-bypass/
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "AmsiScanBuffer"
+        - string: "amsi.dll"
+        - string: "YW1zaS5kbGw="
+      - or:
+        - string: "PatchMem"
+        - string: "x64_am_si_patch"
+        - string: "NtProtectVirtualMemory"
+        - string: "VirtualProtect"

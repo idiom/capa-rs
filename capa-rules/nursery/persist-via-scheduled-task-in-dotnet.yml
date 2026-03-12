@@ -1,0 +1,24 @@
+rule:
+  meta:
+    name: persist via scheduled task in .NET
+    namespace: persistence/scheduled-task
+    authors:
+      - yeti-sec
+    description: Creates scheduled task for persistence using schtasks command via Process.Start.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Persistence::Scheduled Task/Job::Scheduled Task [T1053.005]
+    mbc:
+      - Persistence::Scheduled Task/Job [F0022]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: /schtasks/i
+      - or:
+        - string: "/create"
+        - string: "/sc onlogon"
+        - string: "/rl highest"

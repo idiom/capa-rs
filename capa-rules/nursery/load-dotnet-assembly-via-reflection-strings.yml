@@ -1,0 +1,22 @@
+rule:
+  meta:
+    name: load .NET assembly via reflection (string-based)
+    namespace: load-code/dotnet
+    authors:
+      - yeti-sec
+    description: References .NET reflection methods for dynamic assembly loading. String-based detection for static analysis.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Reflective Code Loading [T1620]
+    mbc:
+      - Defense Evasion::Reflective Code Loading [E1620]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "Assembly.Load"
+        - string: "Assembly.LoadFile"
+        - string: "Assembly.LoadFrom"
+        - string: "AppDomain.Load"

@@ -1,0 +1,24 @@
+rule:
+  meta:
+    name: persist via Run registry key in .NET
+    namespace: persistence/registry
+    authors:
+      - yeti-sec
+    description: References registry Run keys for persistence in a .NET assembly.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Persistence::Boot or Logon Autostart Execution::Registry Run Keys / Startup Folder [T1547.001]
+    mbc:
+      - Persistence::Registry Run Keys / Startup Folder [F0012]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: /CurrentVersion\\Run/i
+        - string: /CurrentVersion\\RunServices/i
+        - string: /CurrentVersion\\RunOnce/i
+        - string: /Policies\\Explorer\\Run/i

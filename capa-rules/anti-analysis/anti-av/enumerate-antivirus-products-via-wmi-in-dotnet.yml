@@ -1,0 +1,29 @@
+rule:
+  meta:
+    name: enumerate antivirus products via WMI in .NET
+    namespace: anti-analysis/anti-av
+    authors:
+      - yeti-sec
+    description: >
+      Uses WMI query against AntivirusProduct class in SecurityCenter2 namespace
+      to enumerate installed antivirus products. This information is used to
+      identify security software and potentially evade or disable it.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Discovery::Software Discovery::Security Software Discovery [T1518.001]
+    mbc:
+      - Discovery::Security Software Discovery [E1518.001]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "Select * from AntivirusProduct"
+        - string: "AntivirusProduct"
+      - or:
+        - string: "SecurityCenter2"
+        - string: "\\root\\SecurityCenter2"
+        - string: "ManagementObjectSearcher"

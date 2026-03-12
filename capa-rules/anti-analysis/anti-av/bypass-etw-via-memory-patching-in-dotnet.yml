@@ -1,0 +1,31 @@
+rule:
+  meta:
+    name: bypass ETW via memory patching in .NET
+    namespace: anti-analysis/anti-av
+    authors:
+      - yeti-sec
+    description: >
+      Patches EtwEventWrite in memory to disable Event Tracing for Windows (ETW).
+      This prevents security tools and EDRs from receiving telemetry about
+      the malware's actions at runtime.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Impair Defenses::Disable or Modify Tools [T1562.001]
+    mbc:
+      - Defense Evasion::Disable or Evade Security Tools [F0004]
+    references:
+      - https://www.mdsec.co.uk/2020/03/hiding-your-net-etw/
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "EtwEventWrite"
+      - or:
+        - string: "PatchMem"
+        - string: "NtProtectVirtualMemory"
+        - string: "VirtualProtect"
+        - string: "GetLibraryAddress"
+        - string: "ntdll.dll"

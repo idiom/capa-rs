@@ -1,0 +1,32 @@
+rule:
+  meta:
+    name: log keystrokes to file in .NET
+    namespace: collection/keylog
+    authors:
+      - yeti-sec
+    description: >
+      Logs keystrokes to local files for later exfiltration. This offline
+      keylogging capability stores captured keystrokes when the C2 server
+      is unavailable, sending them when connectivity is restored.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Collection::Input Capture::Keylogging [T1056.001]
+    mbc:
+      - Collection::Keylogging [F0002]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "OfflineKeylog"
+        - string: "OfflineKeylogger"
+        - string: "DataLogs_keylog_offline.txt"
+        - string: "DataLogs_keylog_online.txt"
+      - or:
+        - string: "keyLogger"
+        - string: "Keylogger"
+        - string: "KeylogParams"
+        - string: "keylogsetting"

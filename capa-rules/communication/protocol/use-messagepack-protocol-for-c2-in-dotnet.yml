@@ -1,0 +1,32 @@
+rule:
+  meta:
+    name: use MessagePack protocol for C2 in .NET
+    namespace: communication/protocol
+    authors:
+      - yeti-sec
+    description: >
+      Uses MessagePack binary serialization format for command and control
+      communication. This protocol is commonly used in AsyncRAT, VenomRAT,
+      and related .NET RAT families for efficient data serialization.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Command and Control::Application Layer Protocol [T1071]
+    mbc:
+      - Communication::C2 Communication [B0030]
+    references:
+      - https://msgpack.org/
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "MsgPack"
+        - string: "MessagePackLib"
+        - string: "MsgPackEnum"
+      - or:
+        - string: "Encode2Stream"
+        - string: "DecodeFromStream"
+        - string: "DecodeFromFile"

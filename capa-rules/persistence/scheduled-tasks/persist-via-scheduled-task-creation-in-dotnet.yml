@@ -1,0 +1,30 @@
+rule:
+  meta:
+    name: persist via scheduled task creation in .NET
+    namespace: persistence/scheduled-tasks
+    authors:
+      - yeti-sec
+    description: >
+      Creates scheduled tasks for persistence using schtasks.exe with /create flag.
+      Common technique in RATs to maintain persistence across reboots by scheduling
+      the malware to run on logon with highest privileges.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Persistence::Scheduled Task/Job::Scheduled Task [T1053.005]
+    mbc:
+      - Persistence::Scheduled Job [F0022]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: /schtasks.*\/create/i
+        - string: "/c schtasks /create"
+        - and:
+          - string: "schtasks"
+          - or:
+            - string: "/create"
+            - string: "/Create"

@@ -1,0 +1,20 @@
+rule:
+  meta:
+    name: communicate via SSL stream in .NET
+    namespace: communication/ssl
+    authors:
+      - yeti-sec
+    description: Uses SslStream for encrypted TLS/SSL communication, commonly used by .NET RATs for secure C2 channels.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Command and Control::Encrypted Channel::Asymmetric Cryptography [T1573.002]
+    mbc:
+      - Communication::Encrypted Channel [C0029]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "SslStream"

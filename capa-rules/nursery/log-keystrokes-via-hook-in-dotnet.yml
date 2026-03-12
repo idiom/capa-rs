@@ -1,0 +1,27 @@
+rule:
+  meta:
+    name: log keystrokes via hook in .NET
+    namespace: collection/keylog
+    authors:
+      - yeti-sec
+    description: Detects keyboard hooking in .NET via P/Invoke to SetWindowsHookEx with keyboard-related APIs.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Collection::Input Capture::Keylogging [T1056.001]
+    mbc:
+      - Collection::Keylogging::Application Hook [F0002.001]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "SetWindowsHookEx"
+      - or:
+        - string: "GetKeyState"
+        - string: "GetAsyncKeyState"
+        - string: "GetKeyboardState"
+      - or:
+        - string: "CallNextHookEx"
+        - string: "GetForegroundWindow"

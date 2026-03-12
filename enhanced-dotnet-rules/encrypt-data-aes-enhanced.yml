@@ -1,0 +1,22 @@
+rule:
+  meta:
+    name: encrypt data using AES (with IL patterns)
+    namespace: data-manipulation/encryption/aes
+    authors:
+      - capa-rs
+    description: >
+      Uses AES encryption with characteristic IL pattern of object instantiation.
+      AES type references at file-level, IL patterns at function-level.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Obfuscated Files or Information [T1027]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "AesCryptoServiceProvider"
+        - string: "AesManaged"
+        - string: "RijndaelManaged"
+      - mnemonic: newobj      # Object instantiation (new AesManaged())

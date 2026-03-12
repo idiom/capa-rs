@@ -1,0 +1,36 @@
+rule:
+  meta:
+    name: implement hidden VNC capability in .NET
+    namespace: collection/remote-access
+    authors:
+      - yeti-sec
+    description: >
+      Implements HVNC (Hidden VNC) functionality for stealthy remote desktop
+      access. HVNC creates a hidden desktop that is invisible to the victim
+      while allowing the attacker full GUI control.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Collection::Screen Capture [T1113]
+      - Command and Control::Remote Access Software [T1219]
+    mbc:
+      - Collection::Screen Capture [E1113]
+    references:
+      - https://www.zscaler.com/blogs/security-research/technical-analysis-hvnc-banking-trojan
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "HVNC"
+        - string: "hvnc"
+        - string: "Hvnc"
+      - or:
+        - string: "HVNC_REPLY_BMP"
+        - string: "HVNC_REPLY_CMP"
+        - string: "HVNC_REPLY_MESSAGE"
+        - string: "HVNCStop"
+        - string: "StopHVNC"
+        - string: "DesktopName"

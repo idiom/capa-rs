@@ -1,0 +1,23 @@
+rule:
+  meta:
+    name: generate hardware ID in .NET
+    namespace: host-interaction/fingerprint
+    authors:
+      - yeti-sec
+    description: Generates hardware fingerprint using system properties. Common for victim identification and licensing checks.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Discovery::System Information Discovery [T1082]
+    mbc:
+      - Discovery::System Information Discovery [E1082]
+  features:
+    - and:
+      - format: dotnet
+      - 2 or more:
+        - string: "Environment.ProcessorCount"
+        - string: "Environment.MachineName"
+        - string: "Environment.UserName"
+        - string: "Environment.OSVersion"
+        - string: "DriveInfo"

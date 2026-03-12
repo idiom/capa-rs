@@ -1,0 +1,31 @@
+rule:
+  meta:
+    name: detect VM via WMI cache memory query in .NET
+    namespace: anti-analysis/anti-vm/vm-detection
+    authors:
+      - yeti-sec
+    description: >
+      Uses WMI query "Select * from Win32_CacheMemory" to detect virtual machines.
+      Physical machines have cache memory information while most VMs do not return
+      results for this query, making it an effective VM detection technique.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]
+    mbc:
+      - Anti-Behavioral Analysis::Virtual Machine Detection::Instruction Testing [B0009.029]
+    references:
+      - https://evasions.checkpoint.com/techniques/wmi.html
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "Select * from Win32_CacheMemory"
+        - string: "select * from Win32_CacheMemory"
+        - string: "Win32_CacheMemory"
+      - or:
+        - string: "ManagementObjectSearcher"
+        - string: "ManagementObject"

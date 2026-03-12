@@ -1,0 +1,21 @@
+rule:
+  meta:
+    name: persist via registry Run key (function-scope)
+    namespace: persistence/registry
+    authors:
+      - capa-rs
+    description: >
+      Writes to registry Run key for persistence. Function-scope detection
+      identifies the exact method performing the persistence.
+    scopes:
+      static: function
+      dynamic: call
+    att&ck:
+      - Persistence::Boot or Logon Autostart Execution::Registry Run Keys/Startup Folder [T1547.001]
+  features:
+    - and:
+      - format: dotnet
+      - string: /CurrentVersion\\Run/i
+      - or:
+        - mnemonic: call       # Method call to registry API
+        - mnemonic: callvirt   # Virtual method call

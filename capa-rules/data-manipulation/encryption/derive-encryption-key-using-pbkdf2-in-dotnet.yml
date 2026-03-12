@@ -1,0 +1,28 @@
+rule:
+  meta:
+    name: derive encryption key using PBKDF2 in .NET
+    namespace: data-manipulation/encryption
+    authors:
+      - yeti-sec
+    description: >
+      Uses Rfc2898DeriveBytes (PBKDF2) to derive encryption keys from passwords.
+      Combined with AES encryption, this is commonly used in .NET malware for
+      encrypting C2 communications or configuration data.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Obfuscated Files or Information [T1027]
+    mbc:
+      - Cryptography::Encryption Key [C0028]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "Rfc2898DeriveBytes"
+      - or:
+        - string: "masterKey"
+        - string: "AesCryptoServiceProvider"
+        - string: "AesManaged"
+        - string: "Aes256"

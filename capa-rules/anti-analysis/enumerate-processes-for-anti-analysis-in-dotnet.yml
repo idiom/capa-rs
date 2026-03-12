@@ -1,0 +1,33 @@
+rule:
+  meta:
+    name: enumerate processes for anti-analysis in .NET
+    namespace: anti-analysis
+    authors:
+      - yeti-sec
+    description: >
+      Enumerates running processes to detect analysis tools like Process Hacker,
+      Process Explorer, Task Manager, and debuggers. Terminates or alters behavior
+      when such tools are detected.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Discovery::Process Discovery [T1057]
+      - Defense Evasion::Debugger Evasion [T1622]
+    mbc:
+      - Anti-Behavioral Analysis::Detect Analysis Tool [B0013]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "Anti_Process"
+        - string: "AntiProcess"
+        - string: "RunAntiAnalysis"
+      - or:
+        - string: "ProcessHacker.exe"
+        - string: "procexp.exe"
+        - string: "Taskmgr.exe"
+        - string: "GetProcessesByName"
+        - string: "GetProcesses"

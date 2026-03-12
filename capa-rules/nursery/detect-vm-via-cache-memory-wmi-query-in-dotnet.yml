@@ -1,0 +1,20 @@
+rule:
+  meta:
+    name: detect VM via cache memory WMI query in .NET
+    namespace: anti-analysis/anti-vm/vm-detection
+    authors:
+      - yeti-sec
+    description: Detects virtual machines by querying Win32_CacheMemory via WMI. VMs typically have fewer than 2 cache memory objects compared to physical machines.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]
+    mbc:
+      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "Win32_CacheMemory"

@@ -1,0 +1,20 @@
+rule:
+  meta:
+    name: encrypt data using AesCryptoServiceProvider in .NET
+    namespace: data-manipulation/encryption/aes
+    authors:
+      - yeti-sec
+    description: Uses AesCryptoServiceProvider for AES encryption, commonly used in .NET malware for encrypting C2 communications or payloads.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Obfuscated Files or Information [T1027]
+    mbc:
+      - Cryptography::Encrypt Data::AES [C0027.001]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "AesCryptoServiceProvider"

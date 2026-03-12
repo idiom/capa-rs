@@ -1,0 +1,23 @@
+rule:
+  meta:
+    name: crypto method detected by name and IL
+    namespace: data-manipulation/encryption
+    authors:
+      - capa-rs
+    description: >
+      Detects encryption/decryption methods by function name patterns
+      combined with characteristic IL patterns. Shows exact crypto methods.
+    scopes:
+      static: function
+      dynamic: call
+    att&ck:
+      - Defense Evasion::Obfuscated Files or Information [T1027]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - function-name: /[Ee]ncrypt/
+        - function-name: /[Dd]ecrypt/
+        - function-name: /[Cc]rypto/
+        - function-name: /Aes/
+      - mnemonic: call        # Calls to crypto APIs

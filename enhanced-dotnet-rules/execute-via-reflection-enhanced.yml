@@ -1,0 +1,28 @@
+rule:
+  meta:
+    name: execute code via reflection (function-scope with IL)
+    namespace: load-code/dotnet/reflection
+    authors:
+      - capa-rs
+    description: >
+      Dynamic code execution via reflection. IL patterns detect Assembly.Load
+      followed by method invocation - common in .NET loaders.
+    scopes:
+      static: function
+      dynamic: call
+    att&ck:
+      - Execution::Shared Modules [T1129]
+      - Defense Evasion::Reflective Code Loading [T1620]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "Assembly.Load"
+        - string: "Assembly.LoadFrom"
+        - string: /Assembly\.Load/
+      - mnemonic: callvirt    # Virtual method call (Invoke)
+      - or:
+        - string: /MethodInfo\.Invoke/
+        - string: /Activator\.CreateInstance/
+        - string: "GetMethod"
+        - string: "GetType"

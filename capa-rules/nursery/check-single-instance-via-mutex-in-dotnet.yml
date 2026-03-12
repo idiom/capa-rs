@@ -1,0 +1,19 @@
+rule:
+  meta:
+    name: check single instance via mutex in .NET
+    namespace: host-interaction/mutex
+    authors:
+      - yeti-sec
+    description: Creates a named mutex to ensure single instance execution. Common anti-sandbox and persistence technique.
+    scopes:
+      static: file
+      dynamic: file
+    mbc:
+      - Process::Check Mutex [C0043]
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "new Mutex("
+        - string: "Mutex(false"
+        - string: "Mutex(true"

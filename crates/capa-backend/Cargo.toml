@@ -1,0 +1,30 @@
+[package]
+name = "capa-backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Binary analysis backend for capa-rs"
+
+[dependencies]
+capa-core = { workspace = true }
+goblin = { workspace = true }
+iced-x86 = { workspace = true }
+capstone = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+memchr = { workspace = true }
+aho-corasick = { workspace = true }
+regex = { workspace = true }
+
+# Hashing
+md-5 = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+
+# dotscope for .NET CIL analysis (pure Rust)
+dotscope = { path = "../dotscope", optional = true }
+
+[features]
+default = []  # Uses blazingly fast iced disassembler by default
+# .NET analysis via dotscope
+dotnet = ["dotscope"]

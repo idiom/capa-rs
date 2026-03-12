@@ -1,0 +1,22 @@
+rule:
+  meta:
+    name: decrypt strings using XOR loop (function-scope with IL)
+    namespace: data-manipulation/decryption/xor
+    authors:
+      - capa-rs
+    description: >
+      XOR decryption loop pattern detected via IL mnemonics. Identifies
+      string decryption routines in obfuscated malware.
+    scopes:
+      static: function
+      dynamic: call
+  features:
+    - and:
+      - format: dotnet
+      - mnemonic: xor         # XOR operation
+      - or:
+        - mnemonic: ldelem.u1  # Load byte from array
+        - mnemonic: ldelem     # Load element from array
+      - or:
+        - mnemonic: stelem.i1  # Store byte to array
+        - mnemonic: stelem     # Store element to array

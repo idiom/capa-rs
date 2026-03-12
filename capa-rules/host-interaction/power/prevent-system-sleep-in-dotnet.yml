@@ -1,0 +1,28 @@
+rule:
+  meta:
+    name: prevent system sleep in .NET
+    namespace: host-interaction/power
+    authors:
+      - yeti-sec
+    description: >
+      Prevents the system from entering sleep or hibernate mode to maintain
+      persistent access. Uses ES_CONTINUOUS flag with SetThreadExecutionState
+      to keep the system awake.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Persistence::Hijack Execution Flow [T1574]
+    mbc:
+      - Impact::System State [B0023]
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - or:
+        - string: "PreventSleep"
+        - string: "ES_CONTINUOUS"
+      - or:
+        - string: "SetThreadExecutionState"
+        - string: "kernel32.dll"

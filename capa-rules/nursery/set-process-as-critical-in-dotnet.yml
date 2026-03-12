@@ -1,0 +1,22 @@
+rule:
+  meta:
+    name: set process as critical in .NET
+    namespace: anti-analysis/anti-termination
+    authors:
+      - yeti-sec
+    description: Marks process as critical so termination causes BSOD. Often combined with Process.EnterDebugMode to acquire necessary privileges.
+    scopes:
+      static: file
+      dynamic: file
+    att&ck:
+      - Defense Evasion::Impair Defenses [T1562]
+    mbc:
+      - Anti-Behavioral Analysis::Debugger Evasion [F0002]
+    references:
+      - https://www.geoffchappell.com/studies/windows/win32/ntdll/api/rtl/peb/setprocessiscritical.htm
+    examples:
+      - The Pit Batch Rat (VenomRAT variant)
+  features:
+    - and:
+      - format: dotnet
+      - string: "RtlSetProcessIsCritical"
