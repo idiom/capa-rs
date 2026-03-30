@@ -25,3 +25,5 @@ colored = { workspace = true }
 default = []
 # .NET analysis via dotscope - enables proper .NET metadata extraction
 dotnet = ["capa-backend/dotnet"]
+# IDA Pro backend via idalib-rs (requires IDA Pro SDK + idalib license)
+ida-backend = ["capa-backend/ida-backend"]

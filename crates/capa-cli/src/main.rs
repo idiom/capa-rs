@@ -152,6 +152,14 @@ struct Cli {
     /// Skip rule matching (use with --dump-features)
     #[arg(long)]
     extract_only: bool,
+
+    /// Analysis backend: "goblin" (default) or "ida" (requires --features ida-backend)
+    #[arg(long, default_value = "goblin")]
+    backend: String,
+
+    /// Save the IDB file after IDA analysis (only with --backend ida)
+    #[arg(long)]
+    save_idb: bool,
 }
 
 fn main() -> Result<()> {
@@ -209,8 +217,24 @@ fn main() -> Result<()> {
             .context("Failed to read features file")?;
         serde_json::from_str::<ExtractedFeatures>(&features_json)
             .context("Failed to parse features JSON")?
+    } else if cli.backend == "ida" {
+        // IDA backend
+        #[cfg(feature = "ida-backend")]
+        {
+            eprintln!("Extracting features via IDA backend for {}...", cli.binary.display());
+            let ida = capa_backend::IdaExtractor::new()
+                .with_save_idb(cli.save_idb);
+            ida.extract_file(&cli.binary)
+                .context("Failed to extract features via IDA")?
+        }
+        #[cfg(not(feature = "ida-backend"))]
+        {
+            eprintln!("Error: IDA backend requires the 'ida-backend' feature.");
+            eprintln!("Rebuild with: cargo build --features ida-backend");
+            std::process::exit(1);
+        }
     } else {
-        // Load binary
+        // Goblin backend (default)
         eprintln!("Loading binary {}...", cli.binary.display());
         let binary = fs::read(&cli.binary)
             .context("Failed to read binary file")?;
