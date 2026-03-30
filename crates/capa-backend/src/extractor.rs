@@ -196,7 +196,7 @@ impl BinaryExtractor {
     }
 
     /// Extract features from a lifted program
-    fn extract_from_lifted(&self, program: &LiftedProgram, bytes: &[u8]) -> ExtractedFeatures {
+    pub(crate) fn extract_from_lifted(&self, program: &LiftedProgram, bytes: &[u8]) -> ExtractedFeatures {
         let info = &program.info;
         let mut features = ExtractedFeatures::new(info.os, info.arch, info.format);
 

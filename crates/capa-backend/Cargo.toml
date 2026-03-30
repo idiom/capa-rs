@@ -24,7 +24,12 @@ sha2 = { workspace = true }
 # dotscope for .NET CIL analysis (pure Rust)
 dotscope = { path = "../dotscope", optional = true }
 
+# IDA Pro backend via idalib-rs (requires IDA Pro SDK + idalib license)
+idalib = { git = "https://github.com/idalib-rs/idalib", tag = "v0.8.1+9.3.260213", optional = true }
+
 [features]
 default = []  # Uses blazingly fast iced disassembler by default
 # .NET analysis via dotscope
 dotnet = ["dotscope"]
+# IDA Pro backend via idalib-rs (requires IDA Pro + idalib license)
+ida-backend = ["dep:idalib"]
