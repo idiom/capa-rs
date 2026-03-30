@@ -961,8 +961,7 @@ checksum = "3d3067d79b975e8844ca9eb072e16b31c3c1c36928edf9c6789548c524d0d954"
 
 [[package]]
 name = "idalib"
-version = "0.8.1+9.3.260213"
-source = "git+https://github.com/idalib-rs/idalib?tag=v0.8.1%2B9.3.260213#668e93cfaa33ee674b31f6b737eb447451f92f53"
+version = "0.7.2+9.2.250908"
 dependencies = [
  "anyhow",
  "autocxx",
@@ -975,8 +974,7 @@ dependencies = [
 
 [[package]]
 name = "idalib-build"
-version = "0.8.1+9.3.260213"
-source = "git+https://github.com/idalib-rs/idalib?tag=v0.8.1%2B9.3.260213#668e93cfaa33ee674b31f6b737eb447451f92f53"
+version = "0.7.2+9.2.250908"
 dependencies = [
  "anyhow",
  "idalib-sys",
@@ -984,8 +982,7 @@ dependencies = [
 
 [[package]]
 name = "idalib-sys"
-version = "0.8.1+9.3.260213"
-source = "git+https://github.com/idalib-rs/idalib?tag=v0.8.1%2B9.3.260213#668e93cfaa33ee674b31f6b737eb447451f92f53"
+version = "0.7.2+9.2.250908"
 dependencies = [
  "anyhow",
  "autocxx",

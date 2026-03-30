@@ -25,7 +25,9 @@ sha2 = { workspace = true }
 dotscope = { path = "../dotscope", optional = true }
 
 # IDA Pro backend via idalib-rs (requires IDA Pro SDK + idalib license)
-idalib = { git = "https://github.com/idalib-rs/idalib", tag = "v0.8.1+9.3.260213", optional = true }
+# Uses local fork with ua_extras.h (print_insn_mnem, print_operand, etc.)
+# TODO: update to upstream once PR is merged, or point to your fork's git URL
+idalib = { path = "../../../idalib-rs/idalib", optional = true }
 
 [features]
 default = []  # Uses blazingly fast iced disassembler by default

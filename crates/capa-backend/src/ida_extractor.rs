@@ -6,8 +6,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::Context;
-use idalib::idb::{IDB, IDBOpenOptions};
+use idalib::idb::IDB;
 
 use crate::extractor::BinaryExtractor;
 use crate::ida_lifter::lift_from_idb;
@@ -41,17 +40,17 @@ impl IdaExtractor {
     ///
     /// This opens the file in IDA, runs auto-analysis, extracts metadata
     /// and instructions, then applies the standard feature detection pipeline.
-    pub fn extract_file(&self, path: &Path) -> anyhow::Result<ExtractedFeatures> {
+    pub fn extract_file(&self, path: &Path) -> Result<ExtractedFeatures, Box<dyn std::error::Error + Send + Sync>> {
+        // Must be called before any IDA initialization to suppress GUI/dialogs
+        idalib::force_batch_mode();
+
         // Read the binary bytes (needed for extract_from_lifted)
         let bytes = fs::read(path)
-            .with_context(|| format!("Failed to read binary: {}", path.display()))?;
+            .map_err(|e| format!("Failed to read binary {}: {}", path.display(), e))?;
 
-        // Open the binary in IDA with auto-analysis
-        let idb = IDBOpenOptions::new()
-            .save(self.save_idb)
-            .auto_analyse(true)
-            .open(path)
-            .with_context(|| format!("Failed to open IDB for: {}", path.display()))?;
+        // Open the binary in IDA with auto-analysis, optionally saving the IDB
+        let idb = IDB::open_with(path, true, self.save_idb)
+            .map_err(|e| format!("Failed to open IDB for {}: {}", path.display(), e))?;
 
         // Extract metadata from IDA
         let info = load_from_idb(&idb);

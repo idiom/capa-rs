@@ -225,7 +225,7 @@ fn main() -> Result<()> {
             let ida = capa_backend::IdaExtractor::new()
                 .with_save_idb(cli.save_idb);
             ida.extract_file(&cli.binary)
-                .context("Failed to extract features via IDA")?
+                .map_err(|e| anyhow::anyhow!("Failed to extract features via IDA: {e}"))?
         }
         #[cfg(not(feature = "ida-backend"))]
         {

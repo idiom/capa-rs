@@ -160,6 +160,95 @@ capa-rs/
 |---------|--------------|-------------|
 | default | `cargo build --release` | x86/x64 analysis via iced-x86 (pure Rust) |
 | dotnet | `cargo build --release --features dotnet` | .NET CIL analysis via dotscope (pure Rust) |
+| ida-backend | `cargo build --release --features ida-backend` | IDA Pro analysis backend via idalib-rs (requires IDA Pro 9.x) |
+
+## IDA Pro Backend
+
+The `ida-backend` feature enables [idalib-rs](https://github.com/binarly-io/idalib) as an analysis backend, giving capa-rs access to IDA Pro's disassembly, type information, and analysis results instead of the default iced-x86/goblin pipeline.
+
+### Prerequisites
+
+- **IDA Pro 9.x** installed with a valid license (tested against v9.2)
+- **idalib-rs** checked out locally at `../idalib-rs` relative to the capa-rs workspace root (i.e., both repos side-by-side on your Desktop or working directory)
+- **LLVM/Clang** — required by idalib-rs's bindgen step to generate FFI bindings from the IDA SDK headers. Install from the [LLVM releases page](https://github.com/llvm/llvm-project/releases) or your system package manager.
+
+### Setup
+
+**1. Clone idalib-rs and initialize the SDK submodule**
+
+```bash
+git clone https://github.com/binarly-io/idalib idalib-rs
+cd idalib-rs
+git submodule update --init --recursive
+```
+
+The IDA SDK is a public git submodule at `idalib-sys/sdk` (auto-fetched from GitHub if not present). Verify it initialized correctly — `idalib-sys/sdk/src/include/pro.h` must exist.
+
+**2. Set environment variables**
+
+Windows (PowerShell):
+```powershell
+$env:PATH = "C:\Program Files\LLVM\bin;C:\Program Files\IDA Professional 9.2;$env:PATH"
+$env:IDADIR = "C:\Program Files\IDA Professional 9.2"
+$env:LIBCLANG_PATH = "C:\Program Files\LLVM\lib"
+```
+
+Linux/macOS:
+```bash
+export PATH="/usr/lib/llvm-17/bin:$PATH"   # adjust LLVM version
+export IDADIR="$HOME/ida-pro-9.2"
+```
+
+**3. Build with the IDA backend feature**
+
+```bash
+cargo build --release --features ida-backend
+```
+
+**4. Run with IDA backend**
+
+```bash
+capa-rs --backend ida -r capa-rules malware.exe
+```
+
+### Known Pain Points
+
+#### Path to idalib-rs must be a sibling directory
+
+The `capa-backend` crate references idalib via a relative path in `Cargo.toml`:
+
+```toml
+idalib = { path = "../../../idalib-rs/idalib", optional = true }
+```
+
+This expects idalib-rs to be checked out at the same level as the capa-rs workspace root (e.g., both under `Desktop/`). If you clone it elsewhere, update this path accordingly.
+
+#### Windows: `/FORCE:UNRESOLVED` required for test binaries
+
+On Windows, idalib links against the IDA SDK's stub `.lib` files at compile time, with the actual symbols resolved at runtime from `idalib.dll`/`ida.dll`. This means the SDK stubs leave some symbols intentionally unresolved. idalib-rs's own build script handles this by emitting `/FORCE:UNRESOLVED` to the linker — but this flag **does not automatically propagate** to test binary link steps in downstream crates.
+
+`capa-backend/build.rs` re-emits this flag when `CARGO_FEATURE_IDA_BACKEND` is set so that `cargo test --features ida-backend` links successfully. If you see linker errors like:
+
+```
+error LNK2019: unresolved external symbol "public: int __cdecl func_t::compare..."
+```
+
+...it means the build script isn't running or the feature flag isn't being detected. Ensure `build.rs` exists in `crates/capa-backend/` and the feature is passed explicitly on the command line.
+
+#### LLVM/Clang must be on PATH at build time
+
+idalib-rs uses `autocxx`/`bindgen` to generate Rust FFI bindings from the IDA SDK C++ headers. This requires `clang` to be available at *build* time (not runtime). If you see errors like `failed to run custom build command for idalib-sys`, check:
+
+```bash
+clang --version   # must succeed
+echo $LIBCLANG_PATH   # must point to LLVM lib dir
+```
+
+On Windows with the LLVM installer, `clang.exe` is typically at `C:\Program Files\LLVM\bin\clang.exe` and `LIBCLANG_PATH` should be `C:\Program Files\LLVM\lib`.
+
+#### IDA license required at runtime
+
+Building with `ida-backend` only requires the IDA SDK (no license). But *running* the binary — including `cargo test --features ida-backend` — initializes IDA Pro and requires a valid license. Tests will fail with a license error if IDA cannot validate. The message `Thank you for using IDA. Have a nice day!` in test output is normal — it's IDA's shutdown log.
 
 ## Architecture
 
