@@ -262,14 +262,14 @@ impl BinaryExtractor {
                 func_features.features.characteristics.insert(CharacteristicType::RecursiveCall);
             }
 
-            // Check for stack string construction
-            if self.detect_stack_strings(func) {
-                func_features.features.characteristics.insert(CharacteristicType::StackString);
-            }
-
             // Extract basic block features
             for bb in &func.basic_blocks {
-                let bb_features = self.extract_basic_block_features(bb, info, program);
+                let mut bb_features = self.extract_basic_block_features(bb, info, program);
+
+                // Detect stack string construction at BB scope
+                if self.detect_stack_strings_in_bb(bb) {
+                    bb_features.characteristics.insert(CharacteristicType::StackString);
+                }
 
                 // Debug: Check for blocks with both TightLoop and Nzxor
                 if bb_features.characteristics.contains(&CharacteristicType::TightLoop)
@@ -419,23 +419,26 @@ impl BinaryExtractor {
         }
 
         // Check for FS/GS segment access (anti-debug, PEB access on Windows)
-        // On Windows x86: FS points to TEB, FS:[0x30] is PEB
-        // On Windows x64: GS points to TEB, GS:[0x60] is PEB
+        // On Windows x86: FS points to TEB, FS:[0x30] is PEB pointer
+        // On Windows x64: GS points to TEB, GS:[0x60] is PEB pointer
         // On Linux: FS/GS are used for TLS, not PEB (no PEB exists)
         for insn in &bb.instructions {
-            let op_str = insn.operands.join(", ").to_lowercase();
-            if op_str.contains("fs:") {
-                features.characteristics.insert(CharacteristicType::FsAccess);
-                // Only mark as PEB access on Windows
-                if info.os == OsType::Windows {
-                    features.characteristics.insert(CharacteristicType::Peb);
+            for op in &insn.operands {
+                let op_lower = op.to_lowercase();
+                if op_lower.contains("fs:") {
+                    features.characteristics.insert(CharacteristicType::FsAccess);
+                    // PEB access requires specific TEB offset on Windows
+                    if info.os == OsType::Windows && self.operand_has_offset(&op_lower, 0x30) {
+                        features.characteristics.insert(CharacteristicType::Peb);
+                    }
                 }
-            }
-            if op_str.contains("gs:") {
-                features.characteristics.insert(CharacteristicType::GsAccess);
-                // On Windows x64, GS access could be TEB/PEB access
-                if info.os == OsType::Windows && info.arch == ArchType::Amd64 {
-                    features.characteristics.insert(CharacteristicType::Peb);
+                if op_lower.contains("gs:") {
+                    features.characteristics.insert(CharacteristicType::GsAccess);
+                    if info.os == OsType::Windows && info.arch == ArchType::Amd64
+                        && self.operand_has_offset(&op_lower, 0x60)
+                    {
+                        features.characteristics.insert(CharacteristicType::Peb);
+                    }
                 }
             }
         }
@@ -477,11 +480,25 @@ impl BinaryExtractor {
         // Mnemonic
         *features.mnemonics.entry(insn.mnemonic.clone()).or_insert(0) += 1;
 
-        // Operand values
+        // Operand values and offsets
         for (idx, val) in insn.operand_values.iter().enumerate() {
-            if let Some(v) = val {
-                features.numbers.insert(*v);
-                features.operands.push((idx, Some(*v), None));
+            let num = val.as_ref().copied();
+            if let Some(v) = num {
+                features.numbers.insert(v);
+            }
+
+            // Extract offset from this operand's memory reference
+            let offset = if idx < insn.operands.len() {
+                self.extract_operand_offset(&insn.operands[idx])
+            } else {
+                None
+            };
+            if let Some(off) = offset {
+                features.offsets.insert(off);
+            }
+
+            if num.is_some() || offset.is_some() {
+                features.operands.push((idx, num, offset));
             }
         }
 
@@ -594,39 +611,63 @@ impl BinaryExtractor {
         false
     }
 
-    /// Detect stack string construction patterns
-    fn detect_stack_strings(&self, func: &LiftedFunction) -> bool {
-        // Look for patterns like: mov [esp+X], imm32 repeated multiple times
-        // This is a common pattern for building strings on the stack
+    /// Detect stack string construction patterns within a single basic block.
+    fn detect_stack_strings_in_bb(&self, bb: &LiftedBasicBlock) -> bool {
         let mut stack_moves = 0;
 
-        for bb in &func.basic_blocks {
-            for insn in &bb.instructions {
-                // Check for mov to stack with immediate value
-                if insn.mnemonic == "mov" && insn.operands.len() >= 2 {
-                    let dst = insn.operands[0].to_lowercase();
+        for insn in &bb.instructions {
+            if insn.mnemonic == "mov" && insn.operands.len() >= 2 {
+                let dst = insn.operands[0].to_lowercase();
 
-                    // Check if destination is stack-relative
-                    let is_stack_dst = dst.contains("esp")
-                        || dst.contains("ebp")
-                        || dst.contains("rsp")
-                        || dst.contains("rbp");
+                let is_stack_dst = dst.contains("esp")
+                    || dst.contains("ebp")
+                    || dst.contains("rsp")
+                    || dst.contains("rbp");
 
-                    // Check if source is a small immediate (likely character)
-                    let is_char_imm = insn.operand_values.get(1).and_then(|v| *v).map_or(false, |v| {
-                        (v >= 0x20 && v <= 0x7E) || // Printable ASCII
-                        (v >= 0x20202020 && v <= 0x7E7E7E7E) // 4 chars packed
-                    });
+                let is_char_imm = insn.operand_values.get(1).and_then(|v| *v).map_or(false, |v| {
+                    is_printable_immediate(v)
+                });
 
-                    if is_stack_dst && is_char_imm {
-                        stack_moves += 1;
-                    }
+                if is_stack_dst && is_char_imm {
+                    stack_moves += 1;
                 }
             }
         }
 
-        // If we see 4+ stack moves with character immediates, likely stack string
         stack_moves >= 4
+    }
+
+    /// Check if an operand string contains a specific offset value.
+    /// e.g., "fs:[0x30]" has offset 0x30, "[ebp+0x30]" has offset 0x30.
+    fn operand_has_offset(&self, op: &str, target: i64) -> bool {
+        if let Some(offset) = self.extract_operand_offset(op) {
+            offset == target
+        } else {
+            false
+        }
+    }
+
+    /// Extract the offset/displacement value from a single operand string.
+    fn extract_operand_offset(&self, op: &str) -> Option<i64> {
+        let op_lower = op.to_lowercase();
+        let bracket_start = op_lower.find('[')?;
+        let bracket_end = op_lower.find(']')?;
+        let inside = &op_lower[bracket_start + 1..bracket_end];
+
+        if let Some(plus_pos) = inside.find('+') {
+            parse_number(inside[plus_pos + 1..].trim())
+        } else if let Some(minus_pos) = inside.find('-') {
+            parse_number(inside[minus_pos + 1..].trim()).map(|v| -v)
+        } else {
+            // Bare address like [0x30]
+            let trimmed = inside.trim();
+            // Only treat as offset if it's a number, not a register name
+            if trimmed.starts_with("0x") || trimmed.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                parse_number(trimmed)
+            } else {
+                None
+            }
+        }
     }
 
     /// Detect call to next instruction (shellcode pattern)
@@ -671,32 +712,47 @@ impl BinaryExtractor {
         finder.find_iter(bytes).map(|pos| pos as u64).collect()
     }
 
-    /// Extract offset values from operands (memory references)
+    /// Extract offset values from operands (memory references).
+    ///
+    /// Handles patterns:
+    /// - `[reg+0x10]` → offset 0x10
+    /// - `[reg-0x8]`  → offset -0x8
+    /// - `[0x401000]` → offset 0x401000  (bare address)
+    /// - `fs:[0x30]`  → offset 0x30      (segment-prefixed)
     fn extract_offsets(&self, insn: &crate::lifter::LiftedInstruction) -> Vec<i64> {
         let mut offsets = Vec::new();
 
         for op in &insn.operands {
             let op_lower = op.to_lowercase();
 
-            // Look for memory offset patterns like [reg+offset] or [offset]
-            if op_lower.contains('[') {
-                // Extract numbers from memory references
-                if let Some(start) = op_lower.find('+') {
-                    let after_plus = &op_lower[start + 1..];
-                    if let Some(end) = after_plus.find(']') {
-                        let offset_str = after_plus[..end].trim();
-                        if let Some(offset) = parse_number(offset_str) {
-                            offsets.push(offset);
-                        }
-                    }
-                } else if let Some(start) = op_lower.find('-') {
-                    let after_minus = &op_lower[start + 1..];
-                    if let Some(end) = after_minus.find(']') {
-                        let offset_str = after_minus[..end].trim();
-                        if let Some(offset) = parse_number(offset_str) {
-                            offsets.push(-offset);
-                        }
-                    }
+            // Find the bracketed portion, stripping any segment prefix (fs:, gs:)
+            let bracket_start = match op_lower.find('[') {
+                Some(pos) => pos,
+                None => continue,
+            };
+            let bracket_end = match op_lower.find(']') {
+                Some(pos) => pos,
+                None => continue,
+            };
+            let inside = &op_lower[bracket_start + 1..bracket_end];
+
+            if let Some(plus_pos) = inside.find('+') {
+                // [reg+offset]
+                let offset_str = inside[plus_pos + 1..].trim();
+                if let Some(offset) = parse_number(offset_str) {
+                    offsets.push(offset);
+                }
+            } else if let Some(minus_pos) = inside.find('-') {
+                // [reg-offset]
+                let offset_str = inside[minus_pos + 1..].trim();
+                if let Some(offset) = parse_number(offset_str) {
+                    offsets.push(-offset);
+                }
+            } else {
+                // [0x401000] or bare address — extract number directly
+                let trimmed = inside.trim();
+                if let Some(offset) = parse_number(trimmed) {
+                    offsets.push(offset);
                 }
             }
         }
@@ -777,6 +833,33 @@ impl BinaryExtractor {
 
         false
     }
+}
+
+/// Check if an immediate value represents printable ASCII character(s).
+///
+/// Handles both single-byte values (0x20..0x7E) and packed multi-byte values
+/// where each non-zero byte is printable ASCII (e.g., 0x726f4d20 = "Mor ").
+fn is_printable_immediate(v: i64) -> bool {
+    // Single ASCII char
+    if v >= 0x20 && v <= 0x7E {
+        return true;
+    }
+    // Packed multi-byte: check each byte is either 0x00 (padding) or printable
+    if v > 0x7E && v <= 0xFFFF_FFFF_FFFF_FFFF_u64 as i64 {
+        let bytes = (v as u64).to_le_bytes();
+        let mut has_printable = false;
+        for &b in &bytes {
+            if b == 0 {
+                continue; // null padding is OK
+            }
+            if b < 0x20 || b > 0x7E {
+                return false; // non-printable byte
+            }
+            has_printable = true;
+        }
+        return has_printable;
+    }
+    false
 }
 
 /// Parse a number from string (hex or decimal)

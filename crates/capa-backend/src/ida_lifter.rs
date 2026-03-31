@@ -8,11 +8,165 @@ use std::collections::HashMap;
 
 use idalib::idb::IDB;
 use idalib::func::FunctionFlags;
+use idalib::insn::{Operand, OperandType, OperandDataType};
+
+use capa_core::rule::ArchType;
 
 use crate::lifter::{
     ILOperation, LiftedBasicBlock, LiftedFunction, LiftedInstruction, LiftedProgram,
 };
 use crate::loader::BinaryInfo;
+
+// ---------------------------------------------------------------------------
+// x86 register name lookup — maps IDA register ID + operand data type to name.
+//
+// IDA register IDs from intel.hpp (SDK):
+//   0-7:   ax,cx,dx,bx,sp,bp,si,di  (GPR base)
+//   8-15:  r8-r15
+//   16-23: al,cl,dl,bl,ah,ch,dh,bh  (explicit byte regs)
+//   24-27: spl,bpl,sil,dil
+//   28-33: es,cs,ss,ds,fs,gs         (segment regs)
+// ---------------------------------------------------------------------------
+
+/// 64/32/16/8-bit names for GPR IDs 0-15.
+/// Index by [reg_id][size_idx] where size_idx: 0=64, 1=32, 2=16, 3=8.
+const GPR_NAMES: [[&str; 4]; 16] = [
+    ["rax", "eax", "ax",  "al"],
+    ["rcx", "ecx", "cx",  "cl"],
+    ["rdx", "edx", "dx",  "dl"],
+    ["rbx", "ebx", "bx",  "bl"],
+    ["rsp", "esp", "sp",  "spl"],
+    ["rbp", "ebp", "bp",  "bpl"],
+    ["rsi", "esi", "si",  "sil"],
+    ["rdi", "edi", "di",  "dil"],
+    ["r8",  "r8d", "r8w", "r8b"],
+    ["r9",  "r9d", "r9w", "r9b"],
+    ["r10", "r10d","r10w","r10b"],
+    ["r11", "r11d","r11w","r11b"],
+    ["r12", "r12d","r12w","r12b"],
+    ["r13", "r13d","r13w","r13b"],
+    ["r14", "r14d","r14w","r14b"],
+    ["r15", "r15d","r15w","r15b"],
+];
+
+/// Explicit byte register names for IDA IDs 16-27.
+const BYTE_REG_NAMES: [&str; 12] = [
+    "al", "cl", "dl", "bl",   // 16-19
+    "ah", "ch", "dh", "bh",   // 20-23
+    "spl", "bpl", "sil", "dil", // 24-27
+];
+
+/// Segment register names for IDA IDs 29-34.
+/// From intel.hpp enum: R_es=29, R_cs=30, R_ss=31, R_ds=32, R_fs=33, R_gs=34.
+/// (R_ip=28 sits between byte regs and segment regs.)
+const SEG_REG_NAMES: [&str; 6] = ["es", "cs", "ss", "ds", "fs", "gs"];
+
+/// IDA segment register IDs for FS and GS (from intel.hpp: R_fs=33, R_gs=34).
+/// insn_t.segpref stores the register ID directly.
+const SEGPREF_FS: i32 = 33;
+const SEGPREF_GS: i32 = 34;
+
+/// Map operand data type to size index for GPR lookup.
+fn dtype_to_size_idx(dtype: OperandDataType) -> usize {
+    match dtype {
+        OperandDataType::QWord => 0,  // 64-bit
+        OperandDataType::DWord => 1,  // 32-bit
+        OperandDataType::Word => 2,   // 16-bit
+        OperandDataType::Byte => 3,   // 8-bit
+        _ => 0,                        // default to 64-bit
+    }
+}
+
+/// Get x86 register name from IDA register ID and operand data type.
+fn x86_reg_name(reg_id: u16, dtype: OperandDataType) -> &'static str {
+    let id = reg_id as usize;
+    if id < 16 {
+        GPR_NAMES[id][dtype_to_size_idx(dtype)]
+    } else if id >= 16 && id < 28 {
+        BYTE_REG_NAMES[id - 16]
+    } else if id >= 29 && id < 35 {
+        SEG_REG_NAMES[id - 29]
+    } else {
+        // XMM/YMM/ST/CR/DR etc — return empty, caller will use fallback
+        ""
+    }
+}
+
+/// Format an operand string from op_t POD fields — no FFI, pure Rust.
+///
+/// Produces strings compatible with what the extractor expects:
+/// - Register: "rax", "esp", etc.
+/// - Immediate: "0x1234"
+/// - Memory: "[0x401000]" or "fs:[0x30]"
+/// - Displacement: "[rbp+0x10]" or "[rsp-0x8]"
+/// - Phrase: "[rax]"
+/// - Near/Far: "0x401000"
+fn format_operand(op: &Operand, segpref: Option<i32>, addr_dtype: OperandDataType) -> String {
+    let seg_prefix = match segpref {
+        Some(SEGPREF_FS) => "fs:",
+        Some(SEGPREF_GS) => "gs:",
+        _ => "",
+    };
+
+    match op.type_() {
+        OperandType::Reg => {
+            let name = x86_reg_name(op.reg().unwrap_or(0), op.dtype());
+            if name.is_empty() {
+                format!("reg{}", op.reg().unwrap_or(0))
+            } else {
+                name.to_string()
+            }
+        }
+        OperandType::Imm => {
+            let val = op.value().unwrap_or(0);
+            format!("0x{:x}", val)
+        }
+        OperandType::Mem => {
+            let addr = op.addr().unwrap_or(0);
+            format!("{}[0x{:x}]", seg_prefix, addr)
+        }
+        OperandType::Displ => {
+            let base = op.phrase().unwrap_or(0);
+            let base_name = x86_reg_name(base, addr_dtype);
+            let disp = op.addr().unwrap_or(0);
+            let base_str = if base_name.is_empty() {
+                format!("reg{}", base)
+            } else {
+                base_name.to_string()
+            };
+            if disp == 0 {
+                format!("{}[{}]", seg_prefix, base_str)
+            } else {
+                // Check if displacement looks negative (high bit set in a
+                // reasonably-sized value).  IDA stores displacements as unsigned
+                // ea_t, but the extractor expects signed formatting.
+                let signed = disp as i64;
+                if signed < 0 && signed > -0x1_0000_0000 {
+                    format!("{}[{}-0x{:x}]", seg_prefix, base_str, -signed)
+                } else {
+                    format!("{}[{}+0x{:x}]", seg_prefix, base_str, disp)
+                }
+            }
+        }
+        OperandType::Phrase => {
+            let base = op.phrase().unwrap_or(0);
+            let base_name = x86_reg_name(base, addr_dtype);
+            if base_name.is_empty() {
+                format!("{}[reg{}]", seg_prefix, base)
+            } else {
+                format!("{}[{}]", seg_prefix, base_name)
+            }
+        }
+        OperandType::Near | OperandType::Far => {
+            let addr = op.addr().unwrap_or(0);
+            format!("0x{:x}", addr)
+        }
+        _ => {
+            // IdpSpec0-5 and other processor-specific operands
+            String::new()
+        }
+    }
+}
 
 /// Lift all functions in the IDB into a LiftedProgram.
 ///
@@ -21,6 +175,13 @@ use crate::loader::BinaryInfo;
 pub(crate) fn lift_from_idb(idb: &IDB, info: BinaryInfo) -> LiftedProgram {
     let mut functions = HashMap::new();
     let entry_point = info.entry_point;
+
+    // Determine addressing register size from binary architecture.
+    // 32-bit binaries use esp/ebp (DWord), 64-bit use rsp/rbp (QWord).
+    let addr_dtype = match info.arch {
+        ArchType::I386 => OperandDataType::DWord,
+        _ => OperandDataType::QWord,
+    };
 
     for (_id, func) in idb.functions() {
         let func_addr = func.start_address();
@@ -31,10 +192,10 @@ pub(crate) fn lift_from_idb(idb: &IDB, info: BinaryInfo) -> LiftedProgram {
 
         // Build CFG and lift basic blocks
         let (basic_blocks, callees) = match func.cfg() {
-            Ok(cfg) => lift_cfg(idb, &cfg, func_addr),
+            Ok(cfg) => lift_cfg(idb, &cfg, func_addr, addr_dtype),
             Err(_) => {
                 // Fallback: create a single basic block for the function
-                let (bb, callees) = lift_linear(idb, func_addr, func.end_address());
+                let (bb, callees) = lift_linear(idb, func_addr, func.end_address(), addr_dtype);
                 (vec![bb], callees)
             }
         };
@@ -99,6 +260,7 @@ fn lift_cfg(
     idb: &IDB,
     cfg: &idalib::func::FunctionCFG<'_>,
     _func_addr: u64,
+    addr_dtype: OperandDataType,
 ) -> (Vec<LiftedBasicBlock>, Vec<u64>) {
     let mut blocks = Vec::new();
     let mut all_callees = Vec::new();
@@ -107,7 +269,7 @@ fn lift_cfg(
         let start = block.start_address();
         let end = block.end_address();
 
-        let (instructions, callees) = lift_instructions(idb, start, end);
+        let (instructions, callees) = lift_instructions(idb, start, end, addr_dtype);
         all_callees.extend(callees);
 
         let successors: Vec<usize> = block.succs().collect();
@@ -134,8 +296,8 @@ fn lift_cfg(
 }
 
 /// Fallback: lift a linear range of instructions as a single basic block.
-fn lift_linear(idb: &IDB, start: u64, end: u64) -> (LiftedBasicBlock, Vec<u64>) {
-    let (instructions, callees) = lift_instructions(idb, start, end);
+fn lift_linear(idb: &IDB, start: u64, end: u64, addr_dtype: OperandDataType) -> (LiftedBasicBlock, Vec<u64>) {
+    let (instructions, callees) = lift_instructions(idb, start, end, addr_dtype);
 
     let bb = LiftedBasicBlock {
         index: 0,
@@ -151,7 +313,7 @@ fn lift_linear(idb: &IDB, start: u64, end: u64) -> (LiftedBasicBlock, Vec<u64>) 
 }
 
 /// Lift instructions in an address range [start, end).
-fn lift_instructions(idb: &IDB, start: u64, end: u64) -> (Vec<LiftedInstruction>, Vec<u64>) {
+fn lift_instructions(idb: &IDB, start: u64, end: u64, addr_dtype: OperandDataType) -> (Vec<LiftedInstruction>, Vec<u64>) {
     let mut instructions = Vec::new();
     let mut callees = Vec::new();
     let mut ea = start;
@@ -178,31 +340,32 @@ fn lift_instructions(idb: &IDB, start: u64, end: u64) -> (Vec<LiftedInstruction>
             continue;
         }
 
-        // Get mnemonic from IDA
+        // Get mnemonic from IDA (1 FFI call — the only one per instruction)
         let mnemonic = insn
             .mnemonic()
             .unwrap_or_default()
             .to_lowercase();
 
-        // Get operands from IDA's print_operand
+        // Build operands from op_t POD fields — zero FFI, pure Rust formatting.
+        // Previously called insn.print_operand(n) per operand (~6 FFI round-trips
+        // + heap allocs), now formats directly from the decoded insn_t struct.
         let mut operands = Vec::new();
         let mut operand_values = Vec::new();
+        let segpref = insn.segpref();
 
         for n in 0..insn.operand_count() {
-            let op_str = insn
-                .print_operand(n)
-                .map(|s| normalize_operand_string(&s))
-                .unwrap_or_default();
-
-            let op_val = insn.operand(n).and_then(|op| {
-                use idalib::insn::OperandType;
-                match op.type_() {
+            let (op_str, op_val) = if let Some(op) = insn.operand(n) {
+                let s = format_operand(&op, segpref, addr_dtype);
+                let v = match op.type_() {
                     OperandType::Imm => op.value().map(|v| v as i64),
                     OperandType::Near | OperandType::Far => op.addr().map(|v| v as i64),
                     OperandType::Mem | OperandType::Displ => op.addr().map(|v| v as i64),
                     _ => None,
-                }
-            });
+                };
+                (s, v)
+            } else {
+                (String::new(), None)
+            };
 
             operands.push(op_str);
             operand_values.push(op_val);
@@ -268,44 +431,6 @@ fn lift_instructions(idb: &IDB, start: u64, end: u64) -> (Vec<LiftedInstruction>
     (instructions, callees)
 }
 
-/// Normalize IDA operand strings to match the format expected by the extractor.
-///
-/// IDA uses Intel hex notation (e.g., `0FFFFh`, `[rbp+8h]`), but the extractor
-/// expects 0x-prefix notation (e.g., `0xffff`, `[rbp+0x8]`).
-fn normalize_operand_string(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let chars: Vec<char> = s.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        // Look for hex numbers in IDA format: digits followed by 'h'
-        if chars[i].is_ascii_hexdigit() {
-            let start = i;
-            while i < chars.len() && chars[i].is_ascii_hexdigit() {
-                i += 1;
-            }
-            if i < chars.len() && (chars[i] == 'h' || chars[i] == 'H') {
-                // Convert "0FFFFh" -> "0xffff"
-                let hex_str = &s[start..i];
-                // Strip leading zeros but keep at least one digit
-                let trimmed = hex_str.trim_start_matches('0');
-                let trimmed = if trimmed.is_empty() { "0" } else { trimmed };
-                result.push_str("0x");
-                result.push_str(&trimmed.to_lowercase());
-                i += 1; // skip the 'h'
-            } else {
-                // Not a hex number, just copy as-is
-                result.push_str(&s[start..i]);
-            }
-        } else {
-            result.push(chars[i]);
-            i += 1;
-        }
-    }
-
-    result
-}
-
 /// Build IAT entry map from imports.
 fn build_iat_map(info: &BinaryInfo) -> HashMap<u64, (Option<String>, String)> {
     let mut iat = HashMap::new();
@@ -359,36 +484,59 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_operand_hex_suffix() {
-        assert_eq!(normalize_operand_string("0FFFFh"), "0xffff");
-        assert_eq!(normalize_operand_string("0h"), "0x0");
-        assert_eq!(normalize_operand_string("1234h"), "0x1234");
+    fn test_x86_reg_name_64bit() {
+        assert_eq!(x86_reg_name(0, OperandDataType::QWord), "rax");
+        assert_eq!(x86_reg_name(4, OperandDataType::QWord), "rsp");
+        assert_eq!(x86_reg_name(5, OperandDataType::QWord), "rbp");
+        assert_eq!(x86_reg_name(8, OperandDataType::QWord), "r8");
+        assert_eq!(x86_reg_name(15, OperandDataType::QWord), "r15");
     }
 
     #[test]
-    fn test_normalize_operand_memory_ref() {
-        assert_eq!(
-            normalize_operand_string("[rbp+8h]"),
-            "[rbp+0x8]"
-        );
-        assert_eq!(
-            normalize_operand_string("[rax+10h]"),
-            "[rax+0x10]"
-        );
+    fn test_x86_reg_name_32bit() {
+        assert_eq!(x86_reg_name(0, OperandDataType::DWord), "eax");
+        assert_eq!(x86_reg_name(4, OperandDataType::DWord), "esp");
+        assert_eq!(x86_reg_name(5, OperandDataType::DWord), "ebp");
+        assert_eq!(x86_reg_name(8, OperandDataType::DWord), "r8d");
     }
 
     #[test]
-    fn test_normalize_operand_no_hex() {
-        assert_eq!(normalize_operand_string("eax"), "eax");
-        assert_eq!(normalize_operand_string("[rbp+rax]"), "[rbp+rax]");
+    fn test_x86_reg_name_16bit() {
+        assert_eq!(x86_reg_name(0, OperandDataType::Word), "ax");
+        assert_eq!(x86_reg_name(4, OperandDataType::Word), "sp");
     }
 
     #[test]
-    fn test_normalize_operand_mixed() {
-        assert_eq!(
-            normalize_operand_string("dword ptr [401000h]"),
-            "dword ptr [0x401000]"
-        );
+    fn test_x86_reg_name_8bit() {
+        assert_eq!(x86_reg_name(0, OperandDataType::Byte), "al");
+        assert_eq!(x86_reg_name(3, OperandDataType::Byte), "bl");
+    }
+
+    #[test]
+    fn test_x86_reg_name_explicit_byte_regs() {
+        assert_eq!(x86_reg_name(16, OperandDataType::Byte), "al");
+        assert_eq!(x86_reg_name(20, OperandDataType::Byte), "ah");
+        assert_eq!(x86_reg_name(24, OperandDataType::Byte), "spl");
+    }
+
+    #[test]
+    fn test_x86_reg_name_segment_regs() {
+        assert_eq!(x86_reg_name(29, OperandDataType::Word), "es");
+        assert_eq!(x86_reg_name(33, OperandDataType::Word), "fs");
+        assert_eq!(x86_reg_name(34, OperandDataType::Word), "gs");
+    }
+
+    #[test]
+    fn test_x86_reg_name_unknown() {
+        assert_eq!(x86_reg_name(100, OperandDataType::QWord), "");
+    }
+
+    #[test]
+    fn test_dtype_to_size_idx() {
+        assert_eq!(dtype_to_size_idx(OperandDataType::QWord), 0);
+        assert_eq!(dtype_to_size_idx(OperandDataType::DWord), 1);
+        assert_eq!(dtype_to_size_idx(OperandDataType::Word), 2);
+        assert_eq!(dtype_to_size_idx(OperandDataType::Byte), 3);
     }
 
     #[test]
