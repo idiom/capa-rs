@@ -112,13 +112,15 @@ rebuild: clean build
 
 # Benchmark: capa-rs IDA backend vs Python capa IDA
 bench-ida SAMPLE='test_samples/floss_conti':
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
     import subprocess
     import json
     import os
     import sys
+    from pathlib import Path
 
-    sample = "{{SAMPLE}}"
+    sample = r"{{SAMPLE}}"
+    sample = str(Path(sample))
 
     print("=" * 50)
     print("Benchmark: IDA Backend Comparison")
@@ -137,7 +139,7 @@ bench-ida SAMPLE='test_samples/floss_conti':
     print("1. Running Python capa + IDA...")
     result = subprocess.run(
         [sys.executable, "-c",
-         "import sys; sys.argv = ['capa', '-b', 'ida', '-j', '" + sample + "']; from capa.main import main; main()"],
+         "import sys; sys.argv = ['capa', '-b', 'ida', '-j', '" + sample.replace('\\', '\\\\') + "']; from capa.main import main; main()"],
         capture_output=True, text=True, timeout=30
     )
     try:
@@ -156,10 +158,10 @@ bench-ida SAMPLE='test_samples/floss_conti':
             pass
 
     # Run capa-rs + IDA
-    print("2. Running capa-rs + IDA (this may take 6-7 seconds)...")
+    print("2. Running capa-rs + IDA (this may take 10-15 seconds)...")
     result = subprocess.run(
         ["cargo", "run", "--release", "--", "--backend", "ida", "-r", "capa-rules", "-j", sample],
-        capture_output=True, text=True, timeout=30
+        capture_output=True, text=True, timeout=60
     )
     try:
         data = json.loads(result.stdout)
@@ -188,7 +190,7 @@ bench-ida SAMPLE='test_samples/floss_conti':
 
 # Benchmark: capa-rs goblin vs Python capa vivisect
 bench-fast SAMPLE='test_samples/floss_conti':
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
     import subprocess
     import json
     import sys
@@ -243,7 +245,7 @@ bench-fast SAMPLE='test_samples/floss_conti':
 
 # Benchmark: All backends (full suite)
 bench-all SAMPLE='test_samples/floss_conti':
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
     import subprocess
 
     print()
