@@ -106,47 +106,53 @@ fn detect_format(meta: &idalib::meta::Metadata<'_>) -> FormatType {
     }
 }
 
-/// Extract imports by finding functions with external xrefs or in import segments.
+/// Extract imports using IDA's native import enumeration API.
 ///
-/// IDA identifies imports through:
-/// 1. Functions in extern/import segments (XTRN/IMP)
-/// 2. Named entries that are imported symbols
-/// 3. .plt thunk functions in ELF (unwrapped to their target name)
+/// This uses `get_import_module_qty()` + `enum_import_names()` to get
+/// proper module→function mappings (e.g., kernel32.dll → CreateFileA),
+/// which is essential for matching capa rules that use `api: module.function`.
+///
+/// Falls back to name-list walking for any imports not covered by the
+/// native API (e.g., ELF .plt thunks).
 fn extract_imports(idb: &IDB) -> Vec<ImportInfo> {
     let mut imports = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
-    // Walk the name list — IDA's name list includes imports
-    let names = idb.names();
-    for name in names.iter() {
-        let addr = name.address();
-
-        // Check if this name is in an import/extern segment
-        if let Some(seg) = idb.segment_at(addr) {
-            let seg_type = seg.r#type();
-            if seg_type.is_xtrn() || seg_type.is_imp() {
-                let func_name = name.name().to_string();
-                if seen.insert(func_name.clone()) {
-                    // Try to extract module name from IDA's naming convention
-                    // e.g., "kernel32_CreateFileA" or just "CreateFileA"
-                    let (module, clean_name) = split_import_name(&func_name);
-                    imports.push(ImportInfo {
-                        name: clean_name,
-                        module,
-                        address: addr,
-                    });
-                }
+    // Primary: use IDA's native import enumeration
+    // This gives us proper module names (kernel32.dll, ntdll.dll, etc.)
+    let ida_imports = idalib::imports::enum_all_imports();
+    for entry in &ida_imports {
+        let module = if entry.module.is_empty() {
+            None
+        } else {
+            // Normalize module name: ensure it has .dll suffix
+            let m = entry.module.to_lowercase();
+            if m.ends_with(".dll") || m.ends_with(".drv") || m.ends_with(".sys")
+                || m.ends_with(".ocx") || m.ends_with(".exe")
+            {
+                Some(m)
+            } else {
+                Some(format!("{}.dll", m))
             }
+        };
+
+        let key = format!("{}@{:#x}", entry.name, entry.address);
+        if seen.insert(key) {
+            imports.push(ImportInfo {
+                name: entry.name.clone(),
+                module,
+                address: entry.address,
+            });
         }
     }
 
-    // Also check for .plt thunk functions (ELF imports)
+    // Secondary: check for .plt thunk functions (ELF imports not in module table)
     for (_id, func) in idb.functions() {
         if func.flags().contains(FunctionFlags::THUNK) {
             if let Some(name) = func.name() {
                 let normalized = name.trim_start_matches(['.', '_']).to_string();
-                if !seen.contains(&normalized) {
-                    seen.insert(normalized.clone());
+                let key = format!("{}@{:#x}", normalized, func.start_address());
+                if seen.insert(key) {
                     imports.push(ImportInfo {
                         name: normalized,
                         module: None,
@@ -158,32 +164,6 @@ fn extract_imports(idb: &IDB) -> Vec<ImportInfo> {
     }
 
     imports
-}
-
-/// Split an import name like "kernel32_CreateFileA" into module + function.
-/// Returns (module, function_name).
-fn split_import_name(name: &str) -> (Option<String>, String) {
-    // Common Windows DLL prefixes that IDA uses in naming
-    let known_modules = [
-        "kernel32", "ntdll", "user32", "advapi32", "ws2_32", "wsock32",
-        "ole32", "oleaut32", "shell32", "gdi32", "msvcrt", "ucrtbase",
-        "comctl32", "comdlg32", "shlwapi", "wininet", "winhttp",
-        "crypt32", "bcrypt", "ncrypt", "secur32", "wtsapi32",
-        "psapi", "iphlpapi", "dnsapi", "netapi32", "mpr",
-    ];
-
-    // Check if name matches "module_function" pattern
-    if let Some(pos) = name.find('_') {
-        let prefix = &name[..pos].to_lowercase();
-        if known_modules.iter().any(|m| m == prefix) {
-            return (
-                Some(format!("{}.dll", prefix)),
-                name[pos + 1..].to_string(),
-            );
-        }
-    }
-
-    (None, name.to_string())
 }
 
 /// Extract exports from functions that are publicly named.
