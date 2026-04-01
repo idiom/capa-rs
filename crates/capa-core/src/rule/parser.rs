@@ -533,7 +533,7 @@ fn parse_offset_feature(value: &Value) -> Result<OffsetMatcher> {
     }
 }
 
-fn parse_bytes_feature(value: &Value) -> Result<Vec<u8>> {
+fn parse_bytes_feature(value: &Value) -> Result<Vec<Option<u8>>> {
     let s = value
         .as_str()
         .ok_or_else(|| CapaError::SyntaxError("Bytes feature must be string".to_string()))?;
@@ -547,7 +547,7 @@ fn parse_bytes_feature(value: &Value) -> Result<Vec<u8>> {
     };
 
     // Parse hex string like "4D 5A" or "4D5A"
-    // Also support wildcards like "??" which we'll skip during matching
+    // Wildcards ("??") are represented as None and match any byte during matching.
     let hex_str: String = hex_part.chars().filter(|c| !c.is_whitespace()).collect();
     if hex_str.len() % 2 != 0 {
         return Err(CapaError::SyntaxError(
@@ -558,13 +558,12 @@ fn parse_bytes_feature(value: &Value) -> Result<Vec<u8>> {
     let mut bytes = Vec::with_capacity(hex_str.len() / 2);
     for i in (0..hex_str.len()).step_by(2) {
         let byte_str = &hex_str[i..i + 2];
-        // Handle wildcard bytes (e.g., "??")
         if byte_str == "??" {
-            bytes.push(0x00); // Placeholder for wildcard - TODO: proper wildcard support
+            bytes.push(None); // Wildcard: matches any byte
         } else {
             let byte = u8::from_str_radix(byte_str, 16)
                 .map_err(|_| CapaError::SyntaxError(format!("Invalid hex byte: {}", byte_str)))?;
-            bytes.push(byte);
+            bytes.push(Some(byte));
         }
     }
 

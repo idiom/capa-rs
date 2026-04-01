@@ -1,6 +1,6 @@
 //! Feature extraction from binaries
 //!
-//! Extracts CAPA features from lifted binary code using iced/vivisect.
+//! Extracts CAPA features from lifted binary code using iced-x86/capstone.
 
 use aho_corasick::AhoCorasick;
 use capa_core::error::Result;
@@ -8,6 +8,8 @@ use capa_core::feature::{Address, ExtractedFeatures, FeatureExtractor, FeatureSe
 use capa_core::rule::{ArchType, CharacteristicType, OsType};
 use log::debug;
 use memchr::memmem;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 /// Normalize module name by stripping the `.dll`/`.DLL` extension.
 /// CAPA rules use `kernel32.VirtualAlloc` not `KERNEL32.dll.VirtualAlloc`.
@@ -59,8 +61,6 @@ fn insert_api(apis: &mut std::collections::HashSet<String>, module: &Option<Stri
         }
     }
 }
-use std::collections::HashMap;
-
 use crate::lifter::{lift_binary, ILOperation, LiftedBasicBlock, LiftedFunction, LiftedProgram};
 use crate::loader::{load_binary, BinaryInfo};
 use crate::dotnet_extractor::{extract_dotnet_features, merge_dotnet_features, merge_dotnet_method_features};
@@ -558,15 +558,16 @@ impl BinaryExtractor {
         }
 
         // Look for CLSID patterns in strings (GUID format: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX})
-        let guid_re = regex::Regex::new(
-            r"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}"
-        ).ok();
+        static GUID_RE: OnceLock<regex::Regex> = OnceLock::new();
+        let guid_re = GUID_RE.get_or_init(|| {
+            regex::Regex::new(
+                r"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}"
+            ).expect("GUID regex is valid")
+        });
 
-        if let Some(re) = guid_re {
-            for si in &info.strings {
-                if re.is_match(&si.value) {
-                    features.classes.insert(si.value.clone());
-                }
+        for si in &info.strings {
+            if guid_re.is_match(&si.value) {
+                features.classes.insert(si.value.clone());
             }
         }
     }
@@ -844,8 +845,10 @@ fn is_printable_immediate(v: i64) -> bool {
     if v >= 0x20 && v <= 0x7E {
         return true;
     }
-    // Packed multi-byte: check each byte is either 0x00 (padding) or printable
-    if v > 0x7E && v <= 0xFFFF_FFFF_FFFF_FFFF_u64 as i64 {
+    // Packed multi-byte: positive values above 0x7E may encode multiple printable chars
+    // (e.g., stack strings built with `mov dword [esp], 0x726f4d20`).
+    // Each non-zero byte must be a printable ASCII character (0x20..0x7E).
+    if v > 0x7E {
         let bytes = (v as u64).to_le_bytes();
         let mut has_printable = false;
         for &b in &bytes {

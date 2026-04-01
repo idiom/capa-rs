@@ -225,8 +225,8 @@ pub enum Feature {
     Offset(OffsetMatcher),
 
     // Byte sequence
-    /// Byte pattern (max 0x100 bytes)
-    Bytes(Vec<u8>),
+    /// Byte pattern (max 0x100 bytes); `None` entries are wildcards matching any byte
+    Bytes(Vec<Option<u8>>),
 
     // Instruction features
     /// Assembly mnemonic

@@ -140,7 +140,6 @@ capa-rs/
 ├── capa-rules/          # CAPA YAML rules (1000+)
 ├── enhanced-dotnet-rules/  # Additional .NET-specific rules
 ├── docs/                # Rule-writing guides
-├── scripts/             # Benchmarking tools
 ├── justfile             # Build automation
 └── ARCHITECTURE.md      # System design and diagrams
 ```

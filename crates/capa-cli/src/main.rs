@@ -109,7 +109,7 @@ fn find_rules_directory() -> Option<PathBuf> {
 #[derive(Parser)]
 #[command(name = "capa-rs")]
 #[command(author = "yeti-sec")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Detect capabilities in executable files", long_about = None)]
 struct Cli {
     /// Path to binary file to analyze
@@ -169,9 +169,10 @@ fn main() -> Result<()> {
 
     // Configure thread pool if specified
     if let Some(num_threads) = cli.threads {
-        let _ = rayon::ThreadPoolBuilder::new()
+        rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
-            .build_global();
+            .build_global()
+            .unwrap_or_else(|e| eprintln!("Warning: failed to set thread pool size: {e}"));
     }
 
     // Find rules directory
@@ -211,6 +212,9 @@ fn main() -> Result<()> {
 
     // Get features - either from pre-extracted JSON or from binary
     let extract_start = Instant::now();
+    // binary_bytes holds the raw file bytes when we read a binary (used for both
+    // feature extraction and hash computation, avoiding a second read).
+    let mut binary_bytes: Option<Vec<u8>> = None;
     let features = if let Some(ref features_path) = cli.features {
         eprintln!("Loading pre-extracted features from {}...", features_path.display());
         let features_json = fs::read_to_string(features_path)
@@ -242,7 +246,7 @@ fn main() -> Result<()> {
         // Extract features (use format if specified)
         let extractor = BinaryExtractor::new();
 
-        if let Some(format) = cli.format.to_format_type() {
+        let result = if let Some(format) = cli.format.to_format_type() {
             eprintln!("Extracting features (format: {:?})...", format);
             extractor.extract_with_format(&binary, format)
                 .context("Failed to extract features")?
@@ -250,7 +254,11 @@ fn main() -> Result<()> {
             eprintln!("Extracting features (auto-detecting format)...");
             extractor.extract(&binary)
                 .context("Failed to extract features")?
-        }
+        };
+
+        // Retain bytes for hash computation below
+        binary_bytes = Some(binary);
+        result
     };
     let extract_time = extract_start.elapsed();
 
@@ -301,21 +309,16 @@ fn main() -> Result<()> {
     };
 
     // Compute sample hashes (matching Python's Metadata.sample)
-    let sample_info = if cli.features.is_none() {
-        // We have a binary file — compute its hashes
-        let binary = fs::read(&cli.binary).ok();
-        binary.map(|bytes| {
-            let hashes = get_sample_hashes(&bytes);
-            SampleInfo {
-                md5: hashes.md5,
-                sha1: hashes.sha1,
-                sha256: hashes.sha256,
-                path: cli.binary.display().to_string(),
-            }
-        })
-    } else {
-        None
-    };
+    // Re-use binary_bytes from extraction to avoid reading the file a second time.
+    let sample_info = binary_bytes.map(|bytes| {
+        let hashes = get_sample_hashes(&bytes);
+        SampleInfo {
+            md5: hashes.md5,
+            sha1: hashes.sha1,
+            sha256: hashes.sha256,
+            path: cli.binary.display().to_string(),
+        }
+    });
 
     let mut output = CapaOutput::from_matches(matches, engine.rule_count())
         .with_timing(timing);

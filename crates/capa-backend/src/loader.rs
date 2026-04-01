@@ -252,12 +252,10 @@ fn load_elf(elf: &goblin::elf::Elf, bytes: &[u8]) -> Result<BinaryInfo, LoaderEr
         }
     };
 
-    // Detect OS from ELF header
-    // Note: ELFOSABI_LINUX and ELFOSABI_GNU have the same value (3)
-    let os = match elf.header.e_ident[goblin::elf::header::EI_OSABI] {
-        goblin::elf::header::ELFOSABI_LINUX => OsType::Linux,
-        _ => OsType::Linux, // Default to Linux for ELF
-    };
+    // ELF is always treated as Linux regardless of OSABI field.
+    // The OSABI byte can indicate FreeBSD, Solaris, etc., but capa rules
+    // target Linux-specific behaviour, so we default uniformly.
+    let os = OsType::Linux;
 
     // Extract imports (dynamic symbols)
     let mut imports = Vec::new();

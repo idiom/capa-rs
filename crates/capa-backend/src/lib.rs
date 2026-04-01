@@ -4,8 +4,8 @@
 //!
 //! Features:
 //! - PE/ELF binary loading via goblin
-//! - Disassembly via iced-x86 (blazingly fast, >250 MB/s)
-//! - Optional vivisect integration for function detection matching Python capa
+//! - x86/x64 disassembly via iced-x86 (>250 MB/s)
+//! - ARM/MIPS/PPC disassembly via capstone
 //! - Function enumeration and basic block detection
 //! - Loop detection for characteristic analysis
 //! - Multi-pattern byte matching with Aho-Corasick
