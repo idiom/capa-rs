@@ -249,6 +249,18 @@ On Windows with the LLVM installer, `clang.exe` is typically at `C:\Program File
 
 Building with `ida-backend` only requires the IDA SDK (no license). But *running* the binary — including `cargo test --features ida-backend` — initializes IDA Pro and requires a valid license. Tests will fail with a license error if IDA cannot validate. The message `Thank you for using IDA. Have a nice day!` in test output is normal — it's IDA's shutdown log.
 
+#### .NET assemblies and the IDA backend
+
+The IDA backend does **not** use `dotscope` for CIL feature extraction. Running `--backend ida` on a .NET binary uses IDA's native .NET support, which surfaces fewer capa-detectable features than the dotscope path and will typically produce near-zero rule matches.
+
+For best results on .NET assemblies, build with `--features dotnet` and use the default goblin backend:
+
+```bash
+cargo build --release --features dotnet
+capa-rs -r capa-rules assembly.exe          # goblin + dotscope (recommended)
+capa-rs -r capa-rules -f dotnet assembly.exe  # force dotnet format detection
+```
+
 ## Architecture
 
 ### Analysis Pipeline
