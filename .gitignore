@@ -19,6 +19,15 @@ features.json
 benchmark/
 samples/
 
+# IDA Pro databases (never commit analysis work or proprietary IDB files)
+*.idb
+*.i64
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+
 # Rust
 **/*.rs.bk
 
