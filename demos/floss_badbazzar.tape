@@ -11,11 +11,11 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 30ms
 
 Hide
-Type "$env:PATH = 'C:\Users\yeti-sec\Desktop\capa-rs-release\capa-rs-release\target\release;' + $env:PATH"
+Type "$env:PATH = 'C:\Users\yeti-sec\Desktop\ida_claude_rev2\tools;' + $env:PATH"
 Enter
 Type "$env:CAPA_RULES = 'C:\Users\yeti-sec\Desktop\capa-rules'"
 Enter
-Type "cd C:\Users\yeti-sec\Desktop\test_samples"
+Type "cd C:\Users\yeti-sec\Desktop\test_samples\floss"
 Enter
 Sleep 1s
 Type "cls"

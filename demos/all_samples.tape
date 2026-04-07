@@ -1,4 +1,4 @@
-# capa-rs demo — all sample types in one recording
+# capa-rs demo — IDA backend + pure-Rust analysis
 
 Output demos/all_samples.gif
 
@@ -11,9 +11,9 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 30ms
 
 Hide
-Type "$env:PATH = 'C:\Users\yeti-sec\Desktop\capa-rs-release\capa-rs-release\target\release;' + $env:PATH"
+Type "$env:PATH = 'C:\Users\yeti-sec\Desktop\capa-rs-release\target\release;C:\Program Files\IDA Professional 9.2;' + $env:PATH"
 Enter
-Type "$env:CAPA_RULES = 'C:\Users\yeti-sec\Desktop\capa-rules'"
+Type "$env:IDADIR = 'C:\Program Files\IDA Professional 9.2'"
 Enter
 Type "cd C:\Users\yeti-sec\Desktop\test_samples"
 Enter
@@ -23,62 +23,48 @@ Enter
 Sleep 500ms
 Show
 
-Type "# 1/8  .NET assembly (njRAT)"
+Type "# 1/6  IDA backend — BadBazaar spyware"
 Enter
 Sleep 0.5s
-Type "capa-rs -f dotnet dotnet_njrat"
+Type "capa-rs --backend ida floss\floss_badbazzar"
 Enter
-Sleep 8s
+Sleep 15s
 
-Type "# 2/8  ELF (Mirai)"
+Type "# 2/6  IDA backend — Conti ransomware"
+Enter
+Sleep 0.5s
+Type "capa-rs --backend ida floss\floss_conti"
+Enter
+Sleep 20s
+
+Type "# 3/6  ELF (Mirai botnet)"
 Enter
 Sleep 0.5s
 Type "capa-rs elf_mirai"
 Enter
 Sleep 8s
 
-Type "# 3/8  Golang PE (Vidar)"
+Type "# 4/6  Golang PE (Vidar stealer)"
 Enter
 Sleep 0.5s
 Type "capa-rs golang_vidar"
 Enter
 Sleep 8s
 
-Type "# 4/8  GraalVM native-image (Cysmos)"
+Type "# 5/6  GraalVM native-image (Cysmos)"
 Enter
 Sleep 0.5s
 Type "capa-rs graalvm_cysmos"
 Enter
 Sleep 8s
 
-Type "# 5/8  Rust PE (CargoBay)"
+Type "# 6/6  Rust PE (CargoBay)"
 Enter
 Sleep 0.5s
 Type "capa-rs rust_cargobay"
 Enter
 Sleep 8s
 
-Type "# 6/8  FLOSS sample (BadBazaar)"
-Enter
-Sleep 0.5s
-Type "capa-rs floss_badbazzar"
-Enter
-Sleep 8s
-
-Type "# 7/8  FLOSS sample (Conti)"
-Enter
-Sleep 0.5s
-Type "capa-rs floss_conti"
-Enter
-Sleep 8s
-
-Type "# 8/8  PE sample"
-Enter
-Sleep 0.5s
-Type "capa-rs b02337d82c44ed46e5b186bd54cde717be39da81a29fb332090d10a5c444ccb6"
-Enter
-Sleep 8s
-
-Type "# All 8 samples analyzed"
+Type "# 6 samples — 2x IDA backend, 4x pure Rust"
 Enter
 Sleep 2s
