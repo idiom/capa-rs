@@ -24,10 +24,10 @@ sha2 = { workspace = true }
 # dotscope for .NET CIL analysis (pure Rust)
 dotscope = { path = "../dotscope", optional = true }
 
-# IDA Pro backend via idalib-rs (requires IDA Pro SDK + idalib license)
-# Uses local fork with ua_extras.h (print_insn_mnem, print_operand, etc.)
-# TODO: update to upstream once PR is merged, or point to your fork's git URL
-idalib = { path = "../../../idalib-rs/idalib", optional = true }
+# IDA Pro backend via idalib-rs (requires IDA Pro 9.x installed with a valid license).
+# Vendored into crates/idalib — includes the import enumeration + instruction text
+# generation API additions (commit 22b61bb09) pending upstream merge.
+idalib = { path = "../idalib", optional = true }
 
 [features]
 default = []  # Uses blazingly fast iced disassembler by default

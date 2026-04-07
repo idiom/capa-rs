@@ -5,6 +5,10 @@ members = [
     "crates/capa-backend",
     "crates/capa-cli",
     "crates/dotscope",
+    # Vendored idalib-rs crates (IDA Pro backend, feature branch not yet upstream)
+    "crates/idalib",
+    "crates/idalib-sys",
+    "crates/idalib-build",
 ]
 
 [workspace.package]
@@ -57,3 +61,4 @@ colored = "2.1"
 # Internal crates
 capa-core = { path = "crates/capa-core" }
 capa-backend = { path = "crates/capa-backend" }
+

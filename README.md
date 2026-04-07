@@ -30,8 +30,9 @@ Analyzes PE, ELF, .NET, and shellcode using CAPA's YAML rule format.
 | ELF x86-64 | ![elf](demos/elf.gif) |
 | Golang PE32 | ![golang](demos/golang.gif) |
 | GraalVM PE64 | ![graalvm](demos/graalvm.gif) |
-| Cobalt Strike beacon | ![beacon](demos/shellcode_beacon.gif) |
-| Cobalt Strike beacon v2 | ![beacon2](demos/shellcode_beacon2.gif) |
+| Rust PE (CargoBay) | ![rust](demos/rust_cargobay.gif) |
+| IDA backend — BadBazaar | ![ida-badbazzar](demos/ida_badbazzar.gif) |
+| IDA backend — Conti | ![ida-conti](demos/ida_conti.gif) |
 
 </details>
 
@@ -117,6 +118,38 @@ capa-rs -r capa-rules --dump-features malware.exe > features.json
 capa-rs -r capa-rules -F features.json
 ```
 
+### IDA Pro Backend
+
+> Requires building with `--features ida-backend` and IDA Pro 9.x installed. See the [IDA Pro Backend](#ida-pro-backend) section for full setup instructions.
+
+```bash
+# Analyze using IDA Pro's disassembler instead of iced-x86/goblin
+capa-rs --backend ida -r capa-rules malware.exe
+
+# IDA backend with verbose output
+capa-rs --backend ida -v -r capa-rules malware.exe
+
+# IDA backend with JSON output
+capa-rs --backend ida -j -r capa-rules malware.exe
+
+# IDA backend with namespace filter
+capa-rs --backend ida -n "anti-analysis" -r capa-rules malware.exe
+```
+
+**Environment setup (Windows):**
+```powershell
+$env:PATH = "C:\Program Files\IDA Professional 9.2;$env:PATH"
+$env:IDADIR = "C:\Program Files\IDA Professional 9.2"
+```
+
+**Environment setup (Linux/macOS):**
+```bash
+export IDADIR="$HOME/ida-pro-9.2"
+export PATH="$IDADIR:$PATH"
+```
+
+> **Note:** The IDA backend is not recommended for .NET assemblies — use the default goblin + `dotnet` feature instead, which produces significantly more rule matches via `dotscope`'s CIL analysis.
+
 ### Supported Formats
 
 | Format | Flag | Description |
@@ -127,6 +160,13 @@ capa-rs -r capa-rules -F features.json
 | .NET | `-f dotnet` | .NET assembly (requires `dotnet` feature) |
 | Shellcode 64 | `-f sc64` | Raw 64-bit x64 shellcode |
 | Shellcode 32 | `-f sc32` | Raw 32-bit x86 shellcode |
+
+### Backends
+
+| Backend | Flag | Build requirement | Best for |
+|---------|------|-------------------|----------|
+| iced-x86 / goblin | *(default)* | none | PE, ELF, shellcode — fast, pure Rust |
+| IDA Pro | `--backend ida` | `--features ida-backend` + IDA Pro 9.x | Binaries already open in IDA; leverages IDA's analysis |
 
 ## Project Structure
 
@@ -163,20 +203,23 @@ capa-rs/
 
 ## IDA Pro Backend
 
-The `ida-backend` feature enables [idalib-rs](https://github.com/binarly-io/idalib) as an analysis backend, giving capa-rs access to IDA Pro's disassembly, type information, and analysis results instead of the default iced-x86/goblin pipeline.
+The `ida-backend` feature enables [idalib-rs](https://github.com/idalib-rs/idalib) as an analysis backend, giving capa-rs access to IDA Pro's disassembly, type information, and analysis results instead of the default iced-x86/goblin pipeline.
+
+> **idalib-rs** is developed and maintained by Sam L. Thomas and Yegor Vasilenko at [Binarly I/O](https://binarly.io). It provides idiomatic Rust bindings to the IDA SDK via `autocxx`/`bindgen`, and supports IDA Pro 9.x (v9.2 tested). See [their repository](https://github.com/idalib-rs/idalib) for setup details and the version compatibility matrix.
 
 ### Prerequisites
 
 - **IDA Pro 9.x** installed with a valid license (tested against v9.2)
-- **idalib-rs** checked out locally at `../idalib-rs` relative to the capa-rs workspace root (i.e., both repos side-by-side on your Desktop or working directory)
-- **LLVM/Clang** — required by idalib-rs's bindgen step to generate FFI bindings from the IDA SDK headers. Install from the [LLVM releases page](https://github.com/llvm/llvm-project/releases) or your system package manager.
+- **LLVM/Clang** — required at *build time* by the vendored idalib-sys to generate FFI bindings from the IDA SDK headers via `autocxx`/`bindgen`. Install from the [LLVM releases page](https://github.com/llvm/llvm-project/releases) or your system package manager.
+
+The idalib-rs crates are vendored inside this repository (`crates/idalib`, `crates/idalib-sys`, `crates/idalib-build`) — no separate clone is needed. The IDA SDK headers are fetched automatically from the public [HexRaysSA/ida-sdk](https://github.com/HexRaysSA/ida-sdk) repository on the first build, or from your IDA installation if `IDASDK_ROOT` is set.
 
 ### Setup
 
 **1. Clone idalib-rs and initialize the SDK submodule**
 
 ```bash
-git clone https://github.com/binarly-io/idalib idalib-rs
+git clone https://github.com/idalib-rs/idalib idalib-rs
 cd idalib-rs
 git submodule update --init --recursive
 ```
@@ -503,6 +546,7 @@ This project builds on the work of several open-source projects:
 - [capa](https://github.com/mandiant/capa) by Mandiant — the original Python capability identification tool
 - [capa-rules](https://github.com/mandiant/capa-rules) by Mandiant — the YAML rule corpus (bundled, Apache 2.0)
 - [dotscope](https://github.com/BinFlip/dotscope) by Johann Kempter (BinFlip) — .NET PE/CIL analysis library
+- [idalib-rs](https://github.com/idalib-rs/idalib) by Sam L. Thomas and Yegor Vasilenko ([Binarly I/O](https://binarly.io)) — idiomatic Rust bindings to the IDA SDK, powering the `ida-backend` feature. Additional contributions from Marco Ivaldi, Boris-Chengbiao Zhou, Willi Ballenthin, Ryan Stortz, Irate Walrus, and Cole Leavitt.
 - [goblin](https://github.com/m4b/goblin) — PE/ELF/Mach-O binary parser
 - [iced-x86](https://github.com/icedland/iced) — x86/x64 disassembler
 - [capstone](https://github.com/capstone-engine/capstone) — multi-architecture disassembly framework
