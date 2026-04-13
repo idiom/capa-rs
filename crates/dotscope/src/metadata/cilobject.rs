@@ -437,7 +437,7 @@ impl CilObject {
         data: Vec<u8>,
         validation_config: ValidationConfig,
     ) -> Result<Self> {
-        let assembly_view = CilAssemblyView::from_mem(data)?;
+        let assembly_view = CilAssemblyView::from_mem_with_validation(data, validation_config.clone())?;
         let object_data = CilObjectData::from_assembly_view(&assembly_view, None)?;
 
         let object = CilObject {

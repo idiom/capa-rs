@@ -58,7 +58,7 @@ pub fn extract_dotnet_features(bytes: &[u8]) -> Option<DotNetExtractedFeatures> 
     let assembly = match CilObject::from_mem_with_validation(bytes.to_vec(), ValidationConfig::disabled()) {
         Ok(asm) => asm,
         Err(e) => {
-            debug!("Failed to parse .NET assembly with dotscope: {:?}", e);
+            eprintln!("[dotnet] dotscope parse error: {:?}", e);
             return None;
         }
     };
@@ -317,8 +317,9 @@ pub fn merge_dotnet_features(features: &DotNetExtractedFeatures, feature_set: &m
         feature_set.strings.insert(string_info.value.clone());
     }
 
-    // Add type names as strings (for class: matching)
+    // Add type names to classes field (for class: matching) and strings
     for type_name in &features.types {
+        feature_set.classes.insert(type_name.clone());
         feature_set.strings.insert(type_name.clone());
     }
 
@@ -328,8 +329,9 @@ pub fn merge_dotnet_features(features: &DotNetExtractedFeatures, feature_set: &m
         feature_set.strings.insert(api.clone());
     }
 
-    // Add namespaces as strings
+    // Add namespaces to namespaces field (for namespace: matching) and strings
     for ns in &features.namespaces {
+        feature_set.namespaces.insert(ns.clone());
         feature_set.strings.insert(ns.clone());
     }
 
@@ -361,6 +363,19 @@ pub fn merge_dotnet_method_features(
 
         // Add method name as function name
         func_features.features.function_names.insert(method.name.clone());
+
+        // Propagate file-level namespaces and classes to function scope
+        for ns in &dotnet_features.namespaces {
+            func_features.features.namespaces.insert(ns.clone());
+        }
+        for type_name in &dotnet_features.types {
+            func_features.features.classes.insert(type_name.clone());
+        }
+
+        // Add API calls to function scope
+        for api in &dotnet_features.api_calls {
+            func_features.features.apis.insert(api.clone());
+        }
 
         // Add per-method IL mnemonics
         for (mnemonic, count) in &method.mnemonics {

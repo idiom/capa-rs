@@ -511,13 +511,8 @@ impl StreamHeader {
         let offset = read_le::<u32>(data)?;
         let size = read_le::<u32>(&data[4..])?;
 
-        // ECMA-335 compliance - Size must be aligned to 4-byte boundary
-        if size % 4 != 0 {
-            return Err(malformed_error!(
-                "Stream size {} is not aligned to 4-byte boundary (ECMA-335 II.24.2.2)",
-                size
-            ));
-        }
+        // ECMA-335 II.24.2.2: Size should be aligned to 4-byte boundary.
+        // Malware and obfuscators commonly violate this — tolerate it for analysis.
 
         // Validate offset bounds - offset must be reasonable
         if offset > 0x7FFF_FFFF {

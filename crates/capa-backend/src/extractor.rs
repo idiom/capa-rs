@@ -897,11 +897,26 @@ impl BinaryExtractor {
 
         // Extract .NET-specific features if this is a .NET assembly
         if info.is_dotnet {
-            debug!("Detected .NET assembly, extracting .NET-specific features via dotscope");
-            if let Some(dotnet_features) = extract_dotnet_features(binary) {
-                merge_dotnet_features(&dotnet_features, &mut features.file);
-                merge_dotnet_method_features(&dotnet_features, &mut features.functions);
+            eprintln!("[dotnet] Detected .NET assembly, extracting features via dotscope...");
+            match extract_dotnet_features(binary) {
+                Some(dotnet_features) => {
+                    eprintln!(
+                        "[dotnet] Extraction OK: {} user strings, {} types, {} namespaces, {} API calls, {} methods",
+                        dotnet_features.user_strings.len(),
+                        dotnet_features.types.len(),
+                        dotnet_features.namespaces.len(),
+                        dotnet_features.api_calls.len(),
+                        dotnet_features.method_features.len()
+                    );
+                    merge_dotnet_features(&dotnet_features, &mut features.file);
+                    merge_dotnet_method_features(&dotnet_features, &mut features.functions);
+                }
+                None => {
+                    eprintln!("[dotnet] WARNING: dotscope failed to parse .NET assembly");
+                }
             }
+        } else {
+            eprintln!("[dotnet] Binary not detected as .NET (is_dotnet=false)");
         }
 
         Ok(features)
@@ -924,22 +939,29 @@ impl FeatureExtractor for BinaryExtractor {
 
         // Extract .NET-specific features if this is a .NET assembly
         if info.is_dotnet {
-            debug!("Detected .NET assembly, extracting .NET-specific features via dotscope");
-            if let Some(dotnet_features) = extract_dotnet_features(binary) {
-                // Merge file-level features
-                merge_dotnet_features(&dotnet_features, &mut features.file);
+            eprintln!("[dotnet] Detected .NET assembly, extracting features via dotscope...");
+            match extract_dotnet_features(binary) {
+                Some(dotnet_features) => {
+                    eprintln!(
+                        "[dotnet] Extraction OK: {} user strings, {} types, {} namespaces, {} API calls, {} methods",
+                        dotnet_features.user_strings.len(),
+                        dotnet_features.types.len(),
+                        dotnet_features.namespaces.len(),
+                        dotnet_features.api_calls.len(),
+                        dotnet_features.method_features.len()
+                    );
+                    // Merge file-level features
+                    merge_dotnet_features(&dotnet_features, &mut features.file);
 
-                // Merge method-level features for function-scope matching
-                merge_dotnet_method_features(&dotnet_features, &mut features.functions);
-
-                debug!(
-                    ".NET extraction complete: {} user strings, {} types, {} API calls, {} methods",
-                    dotnet_features.user_strings.len(),
-                    dotnet_features.types.len(),
-                    dotnet_features.api_calls.len(),
-                    dotnet_features.method_features.len()
-                );
+                    // Merge method-level features for function-scope matching
+                    merge_dotnet_method_features(&dotnet_features, &mut features.functions);
+                }
+                None => {
+                    eprintln!("[dotnet] WARNING: dotscope failed to parse .NET assembly (extract_dotnet_features returned None)");
+                }
             }
+        } else {
+            eprintln!("[dotnet] Binary not detected as .NET (is_dotnet=false)");
         }
 
         Ok(features)
