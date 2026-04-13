@@ -374,7 +374,7 @@ fn print_text_output(output: &CapaOutput, verbose: bool) {
         .map(|cap| CapabilityRow {
             rule: cap.name.clone(),
             namespace: cap.namespace.clone().unwrap_or_else(|| "uncategorized".to_string()),
-            attack: cap.attack.as_ref().map(|a| a.join(", ")).unwrap_or_default(),
+            attack: cap.attack.as_ref().map(|a| a.iter().map(|e| e.id.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default(),
         })
         .collect();
 
@@ -423,9 +423,10 @@ fn print_text_output(output: &CapaOutput, verbose: bool) {
                 "namespace".bright_cyan(),
                 cap.namespace.as_deref().unwrap_or("uncategorized"));
             if let Some(ref attack) = cap.attack {
+                let ids: Vec<&str> = attack.iter().map(|e| e.id.as_str()).collect();
                 println!("    {}:    {}",
                     "ATT&CK".bright_yellow(),
-                    attack.join(", ").bright_yellow());
+                    ids.join(", ").bright_yellow());
             }
             if !cap.locations.is_empty() {
                 // Limit displayed addresses to 25 (like Python capa)

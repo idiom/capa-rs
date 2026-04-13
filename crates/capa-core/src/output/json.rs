@@ -71,7 +71,41 @@ pub struct Capability {
     pub function_names: Vec<String>,
     /// ATT&CK technique IDs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attack: Option<Vec<String>>,
+    pub attack: Option<Vec<AttackEntry>>,
+    /// Malware Behavior Catalog entries
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mbc: Option<Vec<MbcEntry>>,
+    /// Reference URLs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub references: Option<Vec<String>>,
+}
+
+/// Structured ATT&CK entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttackEntry {
+    /// Technique ID (e.g., "T1027", "T1547.001")
+    pub id: String,
+    /// Tactic name (e.g., "Defense Evasion")
+    pub tactic: String,
+    /// Technique name (e.g., "Obfuscated Files or Information")
+    pub technique: String,
+    /// Subtechnique name (e.g., "Registry Run Keys / Startup Folder")
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub subtechnique: String,
+}
+
+/// Structured MBC entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MbcEntry {
+    /// MBC ID (e.g., "C0027.009")
+    pub id: String,
+    /// Objective (e.g., "Cryptography")
+    pub objective: String,
+    /// Behavior (e.g., "Encrypt Data")
+    pub behavior: String,
+    /// Method (e.g., "RC4")
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub method: String,
 }
 
 impl CapaOutput {
@@ -101,7 +135,7 @@ impl CapaOutput {
         for m in &visible_matches {
             for id in &m.attack {
                 // Extract just the technique ID from strings like "Execution::... [T1059]"
-                if let Some(extracted) = extract_technique_id(id) {
+                if let Some(extracted) = extract_id(id) {
                     attack_ids.insert(extracted);
                 }
             }
@@ -126,7 +160,17 @@ impl CapaOutput {
                 attack: if m.attack.is_empty() {
                     None
                 } else {
-                    Some(m.attack.iter().filter_map(|s| extract_technique_id(s)).collect())
+                    Some(m.attack.iter().filter_map(|s| parse_attack_entry(s)).collect())
+                },
+                mbc: if m.mbc.is_empty() {
+                    None
+                } else {
+                    Some(m.mbc.iter().filter_map(|s| parse_mbc_entry(s)).collect())
+                },
+                references: if m.references.is_empty() {
+                    None
+                } else {
+                    Some(m.references.clone())
                 },
             })
             .collect();
@@ -176,8 +220,8 @@ impl CapaOutput {
     }
 }
 
-/// Extract technique ID from ATT&CK string like "Execution::Command [T1059]"
-fn extract_technique_id(s: &str) -> Option<String> {
+/// Extract technique ID from a bracketed string like "Execution::Command [T1059]"
+fn extract_id(s: &str) -> Option<String> {
     let start = s.rfind('[')?;
     let end = s.rfind(']')?;
     if end > start {
@@ -185,6 +229,39 @@ fn extract_technique_id(s: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Parse ATT&CK string like "Defense Evasion::Obfuscated Files or Information [T1027]"
+/// or "Persistence::Boot or Logon Autostart Execution::Registry Run Keys / Startup Folder [T1547.001]"
+fn parse_attack_entry(s: &str) -> Option<AttackEntry> {
+    let id = extract_id(s)?;
+    // Strip the bracketed ID to get the hierarchy
+    let bracket_start = s.rfind('[')?;
+    let hierarchy = s[..bracket_start].trim();
+    let parts: Vec<&str> = hierarchy.split("::").collect();
+
+    Some(AttackEntry {
+        id,
+        tactic: parts.first().unwrap_or(&"").to_string(),
+        technique: parts.get(1).unwrap_or(&"").to_string(),
+        subtechnique: parts.get(2).unwrap_or(&"").to_string(),
+    })
+}
+
+/// Parse MBC string like "Cryptography::Encrypt Data::RC4 [C0027.009]"
+/// or "Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]"
+fn parse_mbc_entry(s: &str) -> Option<MbcEntry> {
+    let id = extract_id(s)?;
+    let bracket_start = s.rfind('[')?;
+    let hierarchy = s[..bracket_start].trim();
+    let parts: Vec<&str> = hierarchy.split("::").collect();
+
+    Some(MbcEntry {
+        id,
+        objective: parts.first().unwrap_or(&"").to_string(),
+        behavior: parts.get(1).unwrap_or(&"").to_string(),
+        method: parts.get(2).unwrap_or(&"").to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -202,7 +279,8 @@ mod tests {
                 locations: vec![Address(0x1000)],
                 function_names: vec!["TestFunc".to_string()],
                 attack: vec!["Execution::Command [T1059]".to_string()],
-                mbc: vec![],
+                mbc: vec!["Cryptography::Encrypt Data::RC4 [C0027.009]".to_string()],
+                references: vec!["https://example.com".to_string()],
                 is_lib: false,
             },
         ];
@@ -212,6 +290,23 @@ mod tests {
         assert_eq!(output.total_rules, 100);
         assert_eq!(output.mitre_attack, vec!["T1059"]);
         assert_eq!(output.capabilities[0].function_names, vec!["TestFunc"]);
+
+        // Verify structured ATT&CK entry
+        let attack = output.capabilities[0].attack.as_ref().unwrap();
+        assert_eq!(attack[0].id, "T1059");
+        assert_eq!(attack[0].tactic, "Execution");
+        assert_eq!(attack[0].technique, "Command");
+
+        // Verify structured MBC entry
+        let mbc = output.capabilities[0].mbc.as_ref().unwrap();
+        assert_eq!(mbc[0].id, "C0027.009");
+        assert_eq!(mbc[0].objective, "Cryptography");
+        assert_eq!(mbc[0].behavior, "Encrypt Data");
+        assert_eq!(mbc[0].method, "RC4");
+
+        // Verify references
+        let refs = output.capabilities[0].references.as_ref().unwrap();
+        assert_eq!(refs[0], "https://example.com");
     }
 
     #[test]
@@ -225,6 +320,7 @@ mod tests {
                 function_names: vec![],
                 attack: vec![],
                 mbc: vec![],
+                references: vec![],
                 is_lib: true, // Library rule - should be filtered
             },
             RuleMatch {
@@ -235,6 +331,7 @@ mod tests {
                 function_names: vec!["VisibleFunc".to_string()],
                 attack: vec![],
                 mbc: vec![],
+                references: vec![],
                 is_lib: false,
             },
         ];
@@ -256,7 +353,14 @@ mod tests {
                 matches: 1,
                 locations: vec![],
                 function_names: vec![],
-                attack: Some(vec!["T1059".to_string()]),
+                attack: Some(vec![AttackEntry {
+                    id: "T1059".to_string(),
+                    tactic: "Execution".to_string(),
+                    technique: "Command".to_string(),
+                    subtechnique: String::new(),
+                }]),
+                mbc: None,
+                references: None,
             }],
             mitre_attack: vec!["T1059".to_string()],
             namespaces: HashMap::new(),

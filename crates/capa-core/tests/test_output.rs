@@ -30,6 +30,7 @@ fn test_output_from_single_match() {
         function_names: vec!["TestFunc".to_string()],
         attack: vec!["Execution::Command [T1059]".to_string()],
         mbc: vec![],
+        references: vec![],
         is_lib: false,
     }];
 
@@ -56,6 +57,7 @@ fn test_lib_rules_not_in_capabilities() {
             function_names: vec![],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: true,
         },
         RuleMatch {
@@ -66,6 +68,7 @@ fn test_lib_rules_not_in_capabilities() {
             function_names: vec!["VisibleFunc".to_string()],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
     ];
@@ -89,6 +92,7 @@ fn test_json_round_trip() {
             function_names: vec!["func_a".to_string(), "func_b".to_string()],
             attack: vec!["Defense Evasion::Obfuscated Files [T1027]".to_string()],
             mbc: vec!["Anti-Behavioral Analysis::Debugger Detection [B0001]".to_string()],
+            references: vec!["https://example.com/ref".to_string()],
             is_lib: false,
         },
         RuleMatch {
@@ -99,6 +103,7 @@ fn test_json_round_trip() {
             function_names: vec![],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
     ];
@@ -137,6 +142,7 @@ fn test_json_compact() {
         function_names: vec![],
         attack: vec![],
         mbc: vec![],
+        references: vec![],
         is_lib: false,
     }];
 
@@ -173,6 +179,7 @@ fn test_multiple_attack_technique_extraction() {
                 "Persistence::Boot or Logon [T1547]".to_string(),
             ],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
         RuleMatch {
@@ -183,6 +190,7 @@ fn test_multiple_attack_technique_extraction() {
             function_names: vec![],
             attack: vec!["Defense Evasion::Obfuscated Files [T1027]".to_string()],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
     ];
@@ -207,6 +215,7 @@ fn test_duplicate_attack_techniques_deduplicated() {
             function_names: vec![],
             attack: vec!["Execution::Command [T1059]".to_string()],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
         RuleMatch {
@@ -217,6 +226,7 @@ fn test_duplicate_attack_techniques_deduplicated() {
             function_names: vec![],
             attack: vec!["Execution::Command [T1059]".to_string()],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
     ];
@@ -240,6 +250,7 @@ fn test_namespace_grouping() {
             function_names: vec![],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
         RuleMatch {
@@ -250,6 +261,7 @@ fn test_namespace_grouping() {
             function_names: vec![],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
         RuleMatch {
@@ -260,6 +272,7 @@ fn test_namespace_grouping() {
             function_names: vec![],
             attack: vec![],
             mbc: vec![],
+            references: vec![],
             is_lib: false,
         },
     ];
@@ -284,6 +297,7 @@ fn test_output_with_timing() {
         function_names: vec![],
         attack: vec![],
         mbc: vec![],
+        references: vec![],
         is_lib: false,
     }];
 
@@ -316,6 +330,7 @@ fn test_file_scope_location_display() {
         function_names: vec![],
         attack: vec![],
         mbc: vec![],
+        references: vec![],
         is_lib: false,
     }];
 
@@ -333,6 +348,7 @@ fn test_function_scope_location_display() {
         function_names: vec![],
         attack: vec![],
         mbc: vec![],
+        references: vec![],
         is_lib: false,
     }];
 

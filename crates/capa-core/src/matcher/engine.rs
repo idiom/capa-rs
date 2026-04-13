@@ -31,6 +31,8 @@ pub struct RuleMatch {
     pub attack: Vec<String>,
     /// MBC IDs
     pub mbc: Vec<String>,
+    /// Reference URLs
+    pub references: Vec<String>,
     /// Is this a library rule?
     pub is_lib: bool,
 }
@@ -197,6 +199,7 @@ impl MatchEngine {
                 function_names,
                 attack: rule.meta.attack.clone(),
                 mbc: rule.meta.mbc.clone(),
+                references: rule.meta.references.clone(),
                 is_lib: rule.meta.is_lib,
             })
         } else {
